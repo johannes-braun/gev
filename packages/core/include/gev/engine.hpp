@@ -82,6 +82,8 @@ namespace gev
     vk::SwapchainKHR swapchain() const;
     vk::Extent2D swapchain_size() const;
 
+    frame const& current_frame() const;
+
     void execute_once(std::function<void(vk::CommandBuffer c)> func, vk::CommandPool pool, bool synchronize = false);
     void execute_once(std::function<void(vk::CommandBuffer c)> func, vk::Queue queue, vk::CommandPool pool, bool synchronize = false);
 
@@ -104,6 +106,8 @@ namespace gev
     VmaVulkanFunctions _vma_functions{};
     shared_allocator _allocator;
     gev::queues _queues;
+
+    frame _current_frame;
 
     descriptor_allocator _descriptor_allocator;
     unique_window _window;

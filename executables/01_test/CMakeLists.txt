@@ -3,7 +3,7 @@ add_executable(01_test
   "camera.cpp"
   "object.cpp" 
   "texture.cpp" "ddf_generator.cpp")
-target_link_libraries(01_test PRIVATE gev.core)
+target_link_libraries(01_test PRIVATE gev.core gev.scenery)
 add_custom_command(TARGET 01_test POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:01_test> $<TARGET_FILE_DIR:01_test>
   COMMAND_EXPAND_LISTS

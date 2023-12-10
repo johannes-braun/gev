@@ -9,6 +9,8 @@
 #include <gev/pipeline.hpp>
 #include <gev/per_frame.hpp>
 #include <gev/imgui/imgui.h>
+#include <gev/scenery/entity_manager.hpp>
+#include <gev/scenery/component.hpp>
 
 #include <rnu/math/math.hpp>
 #include <rnu/obj.hpp>
@@ -142,6 +144,24 @@ struct entity
   std::shared_ptr<simple_material> mtl;
 };
 
+class test_component : public gev::scenery::component
+{
+public:
+  test_component(std::string name)
+    : _name(std::move(name))
+  {
+
+  }
+
+  std::string const& name() const
+  {
+    return _name;
+  }
+
+private:
+  std::string _name;
+};
+
 class test01
 {
 public:
@@ -155,6 +175,49 @@ public:
     gev::engine::get().on_resized([this](auto w, auto h) {
       _per_index.reset(); });
     gev::engine::get().start("Test 01", 1280, 720);
+
+    auto e = _entity_manager.instantiate();
+    e->emplace<test_component>("Scene Root");
+    auto ch01 = _entity_manager.instantiate(e);
+    ch01->emplace<test_component>("Child 01");
+    auto ch02 = _entity_manager.instantiate(e);
+    ch02->emplace<test_component>("Child 02");
+    auto unnamed = _entity_manager.instantiate(e);
+    auto e2 = _entity_manager.instantiate();
+    e2->emplace<test_component>("Other Root");
+    auto och01 = _entity_manager.instantiate(e2);
+    och01->emplace<test_component>("Other Child 01");
+    auto och02 = _entity_manager.instantiate(e2);
+    och02->emplace<test_component>("Other Child 02");
+  }
+
+  std::shared_ptr<gev::scenery::entity> _selected_entity;
+
+  void draw_component_tree(std::span<std::shared_ptr<gev::scenery::entity> const> entities)
+  {
+    for (auto const& e : entities)
+    {
+      auto nc = e->get<test_component>();
+      auto const name = nc ? nc->name() : "<unnamed object>";
+
+      int flags = _selected_entity == e ? ImGuiTreeNodeFlags_Selected : ImGuiTreeNodeFlags_None;
+
+      if (e->children().empty())
+        flags = int(flags | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet);
+
+      if (ImGui::TreeNodeEx(name.c_str(), flags | ImGuiTreeNodeFlags_OpenOnDoubleClick))
+      {
+        if (ImGui::IsItemClicked())
+        {
+          if (_selected_entity == e)
+            _selected_entity = nullptr;
+          else
+            _selected_entity = e;
+        }
+        draw_component_tree(e->children());
+        ImGui::TreePop();
+      }
+    }
   }
 
   int start()
@@ -326,6 +389,24 @@ private:
       ImGui::End();
     }
 
+    if (ImGui::Begin("Entities"))
+    {
+      draw_component_tree(_entity_manager.root_entities());
+      ImGui::End();
+    }
+
+    if (_selected_entity && ImGui::Begin("Entity"))
+    {
+      auto nc = _selected_entity->get<test_component>();
+
+      ImGui::Text("Name: %s", nc ? nc->name().c_str() : "<none>");
+
+      ImGui::InputFloat3("Position", _selected_entity->local_transform.position.data());
+      ImGui::InputFloat4("Orientation", _selected_entity->local_transform.rotation.data());
+      ImGui::InputFloat3("Scale", _selected_entity->local_transform.scale.data());
+      ImGui::End();
+    }
+
     auto const& index = _per_index[frame.frame_index];
     auto const& size = gev::engine::get().swapchain_size();
     auto const& c = frame.command_buffer;
@@ -441,6 +522,8 @@ private:
   bool _fullscreen = false;
   rnu::vec2i _position_before_fullscreen = { 0, 0 };
   rnu::vec2i _size_before_fullscreen = { 0, 0 };
+
+  gev::scenery::entity_manager _entity_manager;
 };
 
 int main(int argc, char** argv)

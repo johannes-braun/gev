@@ -131,6 +131,11 @@ namespace gev
     ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<std::uint8_t*>(rethink_sans), rethink_sans_length, 16, &cfg);
   }
 
+  frame const& engine::current_frame() const
+  {
+    return _current_frame;
+  }
+
   int engine::run(std::function<bool(frame const& f)> runnable)
   {
     vk::CommandBufferAllocateInfo cballoc;
@@ -174,13 +179,12 @@ namespace gev
       ImGui_ImplGlfw_NewFrame();
       ImGui::NewFrame();
 
-      if (!runnable(gev::frame{
-        .delta_time = delta,
-        .frame_index = current_frame,
-        .output_image = frame.output_image,
-        .output_view = frame.output_view.get(),
-        .command_buffer = c
-        }))
+      _current_frame.delta_time = delta;
+      _current_frame.frame_index = current_frame;
+      _current_frame.output_image = frame.output_image;
+      _current_frame.output_view = frame.output_view.get();
+      _current_frame.command_buffer = c;
+      if (!runnable(_current_frame))
       {
         glfwSetWindowShouldClose(_window.get(), true);
       }

@@ -34,6 +34,7 @@ add_library(gev_vulkan_packages INTERFACE)
 target_include_directories(gev_vulkan_packages INTERFACE ${VULKAN_DIR}/Include)
 target_link_libraries(gev_vulkan_packages INTERFACE glfw)
 target_link_libraries(gev_vulkan_packages INTERFACE unofficial::vulkan-memory-allocator::vulkan-memory-allocator ${VK_LIBRARIES})
+target_compile_definitions(gev_vulkan_packages INTERFACE VK_NO_PROTOTYPES VULKAN_HPP_STORAGE_SHARED)
 
 #Manually Create ImGui Library
 add_library(gev.imgui SHARED)
@@ -45,7 +46,7 @@ target_sources(gev.imgui PRIVATE
   "libraries/imgui/backends/imgui_impl_vulkan.cpp"
   "libraries/imgui/backends/imgui_impl_glfw.cpp"
   "libraries/imgui/imgui_tables.cpp"
-  "libraries/imgui/imgui_widgets.cpp")
+  "libraries/imgui/imgui_widgets.cpp"       )
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/imgui/include/gev/imgui)
 file(COPY
     "libraries/imgui/imgui.h"
@@ -55,10 +56,10 @@ file(COPY
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/imgui/include/gev/imgui)
 target_include_directories(gev.imgui PRIVATE BEFORE "libraries/imgui")
 target_include_directories(gev.imgui PUBLIC BEFORE ${CMAKE_CURRENT_BINARY_DIR}/imgui/include)
-target_compile_definitions(gev.imgui PUBLIC VK_NO_PROTOTYPES VULKAN_HPP_STORAGE_SHARED)
 target_link_libraries(gev.imgui PUBLIC gev_vulkan_packages glfw)
 #End Create ImGui Library
 
 add_subdirectory(libraries/rnu)
 add_subdirectory(packages/core)
+add_subdirectory(packages/scenery)
 add_subdirectory(executables/01_test)
