@@ -1,0 +1,6 @@
+[submodule "libraries/imgui"]
+	path = libraries/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "libraries/rnu"]
+	path = libraries/rnu
+	url = https://github.com/johannes-braun/rnu.git
