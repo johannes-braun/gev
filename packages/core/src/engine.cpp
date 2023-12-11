@@ -154,6 +154,8 @@ namespace gev
       { vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint, vk::Format::eD16UnormS8Uint },
       vk::ImageTiling::eOptimal,
       vk::FormatFeatureFlagBits::eDepthStencilAttachment);
+
+    _audio_host = audio::audio_host::create();
   }
 
   frame const& engine::current_frame() const
@@ -686,6 +688,11 @@ namespace gev
 
     if (_callback)
       _callback(_swapchain_size.width, _swapchain_size.height);
+  }
+
+  audio::audio_host& engine::audio_host() const
+  {
+    return *_audio_host;
   }
 
   descriptor_allocator& engine::get_descriptor_allocator()

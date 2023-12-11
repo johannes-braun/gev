@@ -12,6 +12,8 @@
 #include <gev/scenery/entity_manager.hpp>
 #include <gev/scenery/component.hpp>
 #include <gev/audio/audio.hpp>
+#include <gev/audio/sound.hpp>
+#include <gev/audio/playback.hpp>
 
 #include <rnu/math/math.hpp>
 #include <rnu/obj.hpp>
@@ -148,10 +150,63 @@ struct entity
 class test_component : public gev::scenery::component
 {
 public:
-  test_component(std::string name)
-    : _name(std::move(name))
+  test_component(std::string name, std::shared_ptr<gev::audio::sound> sound)
+    : _name(std::move(name)), _sound(std::move(sound))
   {
 
+  }
+
+  virtual void update()
+  {
+    if (_playback)
+    {
+      if (!_playback->is_playing())
+      {
+        _playback.reset();
+      }
+    }
+  }
+
+  void play_sound()
+  {
+    _playback = _sound->open_playback();
+    _playback->play();
+  }
+
+  void ui()
+  {
+    ImGui::Text("Name: %s", _name.c_str());
+
+    ImGui::InputFloat3("Position", owner()->local_transform.position.data());
+    ImGui::InputFloat4("Orientation", owner()->local_transform.rotation.data());
+    ImGui::InputFloat3("Scale", owner()->local_transform.scale.data());
+
+    auto const global = owner()->global_transform();
+    ImGui::Text("Global:");
+    ImGui::Text("Position: (%.3f, %.3f, %.3f)", global.position.x, global.position.y, global.position.z);
+    ImGui::Text("Orientation: (%.3f, %.3f, %.3f, %.3f)", global.rotation.w, global.rotation.x, global.rotation.y, global.rotation.z);
+    ImGui::Text("Scale: (%.3f, %.3f, %.3f)", global.scale.x, global.scale.y, global.scale.z);
+
+    if (_playback) 
+    {
+      ImGui::Text("Playing...");
+      auto l = _playback->is_looping();
+      if (ImGui::Checkbox("Looping", &l))
+        _playback->set_looping(l);
+      auto v = _playback->get_volume();
+      if (ImGui::DragFloat("Volume", &v, 0.01f, 0.0f, 1.0f))
+        _playback->set_volume(v);
+      auto p = _playback->get_pitch();
+      if (ImGui::DragFloat("Pitch", &p, 0.01f, 0.0f, 5.0f))
+        _playback->set_pitch(p);
+      if (ImGui::Button("Stop"))
+        _playback->stop();
+    }
+    else
+    {
+      if (ImGui::Button("Play"))
+        play_sound();
+    }
   }
 
   std::string const& name() const
@@ -161,6 +216,8 @@ public:
 
 private:
   std::string _name;
+  std::shared_ptr<gev::audio::sound> _sound;
+  std::shared_ptr<gev::audio::playback> _playback;
 };
 
 class test01
@@ -172,26 +229,28 @@ public:
     }
   } stop;
 
+  std::shared_ptr<gev::audio::sound> _sound;
+
   test01() {
     gev::engine::get().on_resized([this](auto w, auto h) {
       _per_index.reset(); });
     gev::engine::get().start("Test 01", 1280, 720);
 
+    _sound = gev::engine::get().audio_host().load_file("res/sound.ogg");
+
     auto e = _entity_manager.instantiate();
-    e->emplace<test_component>("Scene Root");
+    e->emplace<test_component>("Scene Root", _sound);
     auto ch01 = _entity_manager.instantiate(e);
-    ch01->emplace<test_component>("Child 01");
+    ch01->emplace<test_component>("Child 01", _sound);
     auto ch02 = _entity_manager.instantiate(e);
-    ch02->emplace<test_component>("Child 02");
+    ch02->emplace<test_component>("Child 02", _sound);
     auto unnamed = _entity_manager.instantiate(e);
     auto e2 = _entity_manager.instantiate();
-    e2->emplace<test_component>("Other Root");
+    e2->emplace<test_component>("Other Root", _sound);
     auto och01 = _entity_manager.instantiate(e2);
-    och01->emplace<test_component>("Other Child 01");
+    och01->emplace<test_component>("Other Child 01", _sound);
     auto och02 = _entity_manager.instantiate(e2);
-    och02->emplace<test_component>("Other Child 02");
-
-    gev::audio::test("res/song.ogg");
+    och02->emplace<test_component>("Other Child 02", _sound);
   }
 
   std::shared_ptr<gev::scenery::entity> _selected_entity;
@@ -208,15 +267,24 @@ public:
       if (e->children().empty())
         flags = int(flags | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet);
 
-      if (ImGui::TreeNodeEx(name.c_str(), flags | ImGuiTreeNodeFlags_OpenOnDoubleClick))
+      auto const elem = ImGui::TreeNodeEx(name.c_str(), flags | ImGuiTreeNodeFlags_OpenOnDoubleClick);
+      if (ImGui::IsItemClicked())
       {
-        if (ImGui::IsItemClicked())
+        if (_selected_entity == e)
+          _selected_entity = nullptr;
+        else
+          _selected_entity = e;
+      }
+      if (nc && (elem || e->children().empty()))
+      {
+        if (ImGui::Button("Play sound here"))
         {
-          if (_selected_entity == e)
-            _selected_entity = nullptr;
-          else
-            _selected_entity = e;
+          nc->play_sound();
         }
+      }
+
+      if(elem)
+      {
         draw_component_tree(e->children());
         ImGui::TreePop();
       }
@@ -298,10 +366,12 @@ public:
     _ddf_gen = std::make_unique<ddf_generator>(_camera->get_descriptor_set_layout());
     for (auto const& e : _entities)
     {
-      _ddf_binder->add(*_ddfs.emplace_back(_ddf_gen->generate(*e.obj, 128)));
+      _ddf_binder->add(*_ddfs.emplace_back(_ddf_gen->generate(*e.obj, 32)));
     }
 
     create_pipelines();
+
+    _entity_manager.spawn();
 
     return gev::engine::get().run([this](auto&& f) { return loop(f); });
   }
@@ -351,6 +421,8 @@ private:
       _count = 0;
       _timer = 0.0;
     }
+    _entity_manager.apply_transform();
+    _entity_manager.early_update();
 
     if (ImGui::Begin("Info"))
     {
@@ -401,18 +473,14 @@ private:
     if (_selected_entity && ImGui::Begin("Entity"))
     {
       auto nc = _selected_entity->get<test_component>();
-
-      ImGui::Text("Name: %s", nc ? nc->name().c_str() : "<none>");
-
-      ImGui::InputFloat3("Position", _selected_entity->local_transform.position.data());
-      ImGui::InputFloat4("Orientation", _selected_entity->local_transform.rotation.data());
-      ImGui::InputFloat3("Scale", _selected_entity->local_transform.scale.data());
+      if(nc) nc->ui();
       ImGui::End();
     }
 
     auto const& index = _per_index[frame.frame_index];
     auto const& size = gev::engine::get().swapchain_size();
     auto const& c = frame.command_buffer;
+    _entity_manager.update();
 
     frame.output_image->layout(c,
       vk::ImageLayout::eColorAttachmentOptimal,
@@ -498,6 +566,7 @@ private:
       c.endRendering();
     }
 
+    _entity_manager.late_update();
     return true;
   }
 

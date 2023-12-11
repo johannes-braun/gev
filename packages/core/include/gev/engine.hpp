@@ -1,15 +1,17 @@
 #pragma once
 
-#include <string>
-#include <functional>
-#include <vulkan/vulkan.hpp>
 #include <gev/vma.hpp>
 #include <gev/window.hpp>
-#include <GLFW/glfw3.h>
 #include <gev/image.hpp>
 #include <gev/logger.hpp>
 #include <gev/descriptors.hpp>
 #include <gev/imgui/imgui.h>
+#include <gev/audio/audio.hpp>
+
+#include <string>
+#include <functional>
+#include <vulkan/vulkan.hpp>
+#include <GLFW/glfw3.h>
 #include <any>
 #include <unordered_map>
 
@@ -85,6 +87,7 @@ namespace gev
     vk::Extent2D swapchain_size() const;
 
     logger& logger();
+    audio::audio_host& audio_host() const;
 
     frame const& current_frame() const;
 
@@ -127,6 +130,7 @@ namespace gev
     std::function<void(int w, int h)> _callback;
 
     vk::UniqueDescriptorPool _imgui_descriptor_pool;
+    std::unique_ptr<audio::audio_host> _audio_host;
 
     ImGuiContext* _imgui_context = nullptr;
   };

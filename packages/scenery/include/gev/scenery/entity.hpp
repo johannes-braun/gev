@@ -41,6 +41,8 @@ namespace gev::scenery
     void apply_transform();
     std::span<std::shared_ptr<entity> const> children() const;
 
+    transform const& global_transform() const;
+
   private:
     std::weak_ptr<entity> _parent;
 

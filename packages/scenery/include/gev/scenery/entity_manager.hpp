@@ -16,6 +16,12 @@ namespace gev::scenery
       return _root_entities;
     }
 
+    void spawn() const;
+    void early_update() const;
+    void update() const;
+    void late_update() const;
+    void apply_transform() const;
+
   private:
     void remove_from_parent(std::shared_ptr<entity>const& target);
     void add_to_parent(std::shared_ptr<entity>const& target, std::shared_ptr<entity> parent = nullptr);

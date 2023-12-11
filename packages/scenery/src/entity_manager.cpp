@@ -41,4 +41,37 @@ namespace gev::scenery
       r->_parent = parent;
     }
   }
+
+  void entity_manager::apply_transform() const
+  {
+    for (auto const& c : _root_entities)
+    {
+      c->_global_transform = {};
+      c->apply_transform();
+    }
+  }
+
+  void entity_manager::spawn() const
+  {
+    for (auto const& c : _root_entities)
+      c->spawn();
+  }
+
+  void entity_manager::early_update() const
+  {
+    for (auto const& c : _root_entities)
+      c->early_update();
+  }
+
+  void entity_manager::update() const
+  {
+    for (auto const& c : _root_entities)
+      c->update();
+  }
+
+  void entity_manager::late_update() const
+  {
+    for (auto const& c : _root_entities)
+      c->late_update();
+  }
 }
