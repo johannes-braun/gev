@@ -10,7 +10,7 @@ add_executable(01_test
   "texture.cpp"
   "ddf_generator.cpp"
   ${WIN32_RESOURCES})
-target_link_libraries(01_test PRIVATE gev.core gev.scenery)
+target_link_libraries(01_test PRIVATE gev.core gev.scenery gev.imgui gev.audio)
 add_custom_command(TARGET 01_test POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:01_test> $<TARGET_FILE_DIR:01_test>
   COMMAND_EXPAND_LISTS

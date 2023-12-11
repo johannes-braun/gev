@@ -46,12 +46,12 @@ target_sources(gev.imgui PRIVATE
   "libraries/imgui/backends/imgui_impl_vulkan.cpp"
   "libraries/imgui/backends/imgui_impl_glfw.cpp"
   "libraries/imgui/imgui_tables.cpp"
-  "libraries/imgui/imgui_widgets.cpp"       )
+  "libraries/imgui/imgui_widgets.cpp")
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/imgui/include/gev/imgui)
 file(COPY
     "libraries/imgui/imgui.h"
     "libraries/imgui/imconfig.h"
-    "libraries/imgui/backends/imgui_impl_vulkan.h" 
+    "libraries/imgui/backends/imgui_impl_vulkan.h"
     "libraries/imgui/backends/imgui_impl_glfw.h"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/imgui/include/gev/imgui)
 target_include_directories(gev.imgui PRIVATE BEFORE "libraries/imgui")
@@ -62,4 +62,5 @@ target_link_libraries(gev.imgui PUBLIC gev_vulkan_packages glfw)
 add_subdirectory(libraries/rnu)
 add_subdirectory(packages/core)
 add_subdirectory(packages/scenery)
+add_subdirectory(packages/audio)
 add_subdirectory(executables/01_test)

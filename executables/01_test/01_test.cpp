@@ -11,6 +11,7 @@
 #include <gev/imgui/imgui.h>
 #include <gev/scenery/entity_manager.hpp>
 #include <gev/scenery/component.hpp>
+#include <gev/audio/audio.hpp>
 
 #include <rnu/math/math.hpp>
 #include <rnu/obj.hpp>
@@ -189,6 +190,8 @@ public:
     och01->emplace<test_component>("Other Child 01");
     auto och02 = _entity_manager.instantiate(e2);
     och02->emplace<test_component>("Other Child 02");
+
+    gev::audio::test("res/song.ogg");
   }
 
   std::shared_ptr<gev::scenery::entity> _selected_entity;
