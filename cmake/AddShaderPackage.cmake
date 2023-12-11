@@ -36,6 +36,9 @@ macro(build_shader file prefix list shader_paths_code_lines)
     )
     list(APPEND ${list} "${CMAKE_CURRENT_BINARY_DIR}/${prefix}/${FILE_REL}.spv")
     list(APPEND ${shader_paths_code_lines} "namespace ${NAMESPACE} { constexpr static char const ${FILE_REL_ALL}[] = \"${prefix}/${FILE_REL}.spv\"§ }\n")
+    
+    get_filename_component(PARENT_DIR "${prefix}/${FILE_REL}.spv" DIRECTORY)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${prefix}/${FILE_REL}.spv" DESTINATION "${PARENT_DIR}")
 endmacro()
 
 function(compile_shaders target_name)
@@ -61,6 +64,7 @@ function(compile_shaders target_name)
   file(APPEND "${FILES_HEADER}" "}\n")
 
   add_custom_target(${target_name}deps ALL DEPENDS ${SPIRV_FILES})
+
   add_library(${target_name} INTERFACE)
   target_include_directories(${target_name} INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/include/${target_name})
   add_dependencies(${target_name} INTERFACE ${target_name}deps)

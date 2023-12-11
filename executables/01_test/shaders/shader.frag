@@ -78,7 +78,7 @@ float ambientOcclusion (vec3 pos, vec3 normal)
   float _AOStepSize  = 0.08;
     float sum    = 0;
     float maxSum = 0;
-    for (int i = 0; i < 16; i ++)
+    for (int i = 0; i < 8; i ++)
     {
         vec3 p = pos + normal * (i+1) * _AOStepSize;
         sum    += 1. / pow(2., i) * map(p);

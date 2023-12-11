@@ -1,8 +1,15 @@
+if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    enable_language("RC")
+    set (WIN32_RESOURCES test01.rc)
+endif()
+
 add_executable(01_test 
   "01_test.cpp" 
   "camera.cpp"
   "object.cpp" 
-  "texture.cpp" "ddf_generator.cpp")
+  "texture.cpp"
+  "ddf_generator.cpp"
+  ${WIN32_RESOURCES})
 target_link_libraries(01_test PRIVATE gev.core gev.scenery)
 add_custom_command(TARGET 01_test POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:01_test> $<TARGET_FILE_DIR:01_test>
@@ -27,3 +34,12 @@ target_link_libraries(01_test PRIVATE test_shaders rnu::rnu)
 
 find_package(Stb REQUIRED)
 target_include_directories(01_test PRIVATE ${Stb_INCLUDE_DIR})
+
+install(TARGETS 01_test
+    RUNTIME_DEPENDENCIES
+    # exclude whatever these are?
+    PRE_EXCLUDE_REGEXES "api-ms-" "ext-ms-"
+    # exclude 32 bit versions of dependencies maybe?
+    POST_EXCLUDE_REGEXES ".*system32/.*\\.dll"
+    RUNTIME DESTINATION .)
+install(DIRECTORY res DESTINATION .)

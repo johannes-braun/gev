@@ -230,14 +230,28 @@ void main()
             vec3 vertex0 = vertices[indices[i + 0]].xyz;
             vec3 vertex1 = vertices[indices[i + 1]].xyz;
             vec3 vertex2 = vertices[indices[i + 2]].xyz;
+            
+            vec3 c = (vertex0 + vertex1 + vertex2) * 0.333333333;
+            vec3 d0 = vertex0 - c;
+            vec3 d1 = vertex1 - c;
+            vec3 d2 = vertex2 - c;
+            vec3 dp = pos - c;
+
+            float l0 = dot(d0, d0);
+            float l1 = dot(d1, d1);
+            float l2 = dot(d2, d2);
+            float maxl = max(l0, max(l1, l2));
+            float lp = dot(dp, dp);
+
+            if(gridVal * gridVal <= lp - maxl)
+              continue;
 
             vec3 face_normal = normalize(cross(vertex1 - vertex0, vertex2 - vertex0));
             vec4 dist        = get_gistance(pos, vertex0, vertex1, vertex2);
-
-            float sign = options.is_signed == 1 ? sign(dot(face_normal, pos - dist.xyz)) : 1.f;
             if(dist.w < abs(gridVal))
             {
-                gridVal = sign * dist.w;
+              float sign = options.is_signed == 1 ? sign(dot(face_normal, pos - dist.xyz)) : 1.f;
+              gridVal = sign * dist.w;
             }
         }
 

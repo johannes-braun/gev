@@ -226,7 +226,7 @@ public:
       auto const size = gev::engine::get().swapchain_size();
       render_attachments idx;
       idx.depth_image = std::make_shared<gev::image>(vk::ImageCreateInfo()
-        .setFormat(vk::Format::eD16UnormS8Uint)
+        .setFormat(gev::engine::get().depth_format())
         .setArrayLayers(1)
         .setExtent({ size.width, size.height, 1 })
         .setImageType(vk::ImageType::e2D)
@@ -280,7 +280,7 @@ public:
       auto& e = _entities.emplace_back();
       e.obj = std::make_shared<object>("res/torus.obj");
       e.mtl = std::make_shared<simple_material>(*_material_set_layout);
-      e.mtl->load_diffuse(std::make_unique<texture>("res/grass.jpg"));
+      e.mtl->load_diffuse(std::make_unique<texture>("res/dirt.png"));
       e.mtl->load_roughness(std::make_unique<texture>("res/ground_roughness.jpg"));
     }
 
@@ -295,7 +295,7 @@ public:
     _ddf_gen = std::make_unique<ddf_generator>(_camera->get_descriptor_set_layout());
     for (auto const& e : _entities)
     {
-      _ddf_binder->add(*_ddfs.emplace_back(_ddf_gen->generate(*e.obj, 64)));
+      _ddf_binder->add(*_ddfs.emplace_back(_ddf_gen->generate(*e.obj, 128)));
     }
 
     create_pipelines();
@@ -323,8 +323,8 @@ public:
       .binding(2, sizeof(rnu::vec2))
       .multisampling(vk::SampleCountFlagBits::e4)
       .color_attachment(gev::engine::get().swapchain_format().surfaceFormat.format)
-      .depth_attachment(vk::Format::eD16UnormS8Uint)
-      .stencil_attachment(vk::Format::eD16UnormS8Uint)
+      .depth_attachment(gev::engine::get().depth_format())
+      .stencil_attachment(gev::engine::get().depth_format())
       .build();
 
     auto env_vertex_shader = gev::create_shader(gev::load_spv(test_shaders::shaders::environment_vert));

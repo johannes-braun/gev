@@ -7,6 +7,7 @@
 #include <gev/window.hpp>
 #include <GLFW/glfw3.h>
 #include <gev/image.hpp>
+#include <gev/logger.hpp>
 #include <gev/descriptors.hpp>
 #include <gev/imgui/imgui.h>
 #include <any>
@@ -79,8 +80,11 @@ namespace gev
     GLFWwindow* window() const;
     vk::SurfaceKHR window_surface() const;
     vk::SurfaceFormat2KHR swapchain_format() const;
+    vk::Format depth_format() const;
     vk::SwapchainKHR swapchain() const;
     vk::Extent2D swapchain_size() const;
+
+    logger& logger();
 
     frame const& current_frame() const;
 
@@ -99,6 +103,9 @@ namespace gev
     void create_swapchain();
 
     static std::unique_ptr<engine> _engine;
+
+    gev::logger _logger;
+
     vk::UniqueInstance _instance;
     vk::PhysicalDevice _physical_device;
     vk::UniqueDevice _device;
@@ -106,6 +113,7 @@ namespace gev
     VmaVulkanFunctions _vma_functions{};
     shared_allocator _allocator;
     gev::queues _queues;
+    vk::Format _depth_format;
 
     frame _current_frame;
 

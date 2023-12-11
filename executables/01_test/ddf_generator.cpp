@@ -132,8 +132,8 @@ void ddf_generator::recreate_pipelines()
     .stage(vk::ShaderStageFlagBits::eFragment, fs)
     .multisampling(vk::SampleCountFlagBits::e4)
     .color_attachment(gev::engine::get().swapchain_format().surfaceFormat.format)
-    .depth_attachment(vk::Format::eD16UnormS8Uint)
-    .stencil_attachment(vk::Format::eD16UnormS8Uint)
+    .depth_attachment(gev::engine::get().depth_format())
+    .stencil_attachment(gev::engine::get().depth_format())
     .build();
 }
 

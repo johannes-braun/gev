@@ -54,6 +54,26 @@ namespace gev
     _engine.reset();
   }
 
+  logger& engine::logger()
+  {
+    return _logger;
+  }
+
+  vk::Format find_supported_format(vk::PhysicalDevice device, vk::ArrayProxy<vk::Format const> candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) {
+    for (auto const format : candidates) {
+      auto const props = device.getFormatProperties(format);
+
+      if (tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features) {
+        return format;
+      }
+      else if (tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features) {
+        return format;
+      }
+    }
+
+    throw std::runtime_error("failed to find supported format!");
+  }
+
   void engine::start_impl(std::string const& title, int width, int height)
   {
     static class glfw_initializer {
@@ -129,6 +149,11 @@ namespace gev
     ImFontConfig cfg{};
     cfg.FontDataOwnedByAtlas = false;
     ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<std::uint8_t*>(rethink_sans), rethink_sans_length, 16, &cfg);
+
+    _depth_format = find_supported_format(_physical_device,
+      { vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint, vk::Format::eD16UnormS8Uint },
+      vk::ImageTiling::eOptimal,
+      vk::FormatFeatureFlagBits::eDepthStencilAttachment);
   }
 
   frame const& engine::current_frame() const
@@ -253,6 +278,11 @@ namespace gev
     ImGui::DestroyContext(_imgui_context);
   }
 
+  vk::Format engine::depth_format() const
+  {
+    return _depth_format;
+  }
+
   std::uint32_t engine::num_images() const noexcept
   {
     return static_cast<std::uint32_t>(_per_swapchain_image.size());
@@ -341,7 +371,7 @@ namespace gev
         if (std::string_view(cur.layerName.data()) == std::string_view(req))
         {
           found_instance_layers.push_back(req);
-          std::println("Layer     FOUND: {}", req);
+          _logger.debug("Layer {}: FOUND", req);
           found = true;
           break;
         }
@@ -349,7 +379,7 @@ namespace gev
       if (found)
         continue;
 
-      std::println("Layer NOT FOUND: {}", req);
+      _logger.warn("Layer {}: NOT FOUND", req);
     }
 
     for (auto const& req : required_instance_extensions)
@@ -360,7 +390,7 @@ namespace gev
         if (std::string_view(cur.extensionName.data()) == std::string_view(req))
         {
           found_instance_extensions.push_back(req);
-          std::println("Extension     FOUND: {}", req);
+          _logger.debug("Extension {}: FOUND", req);
           found = true;
           break;
         }
@@ -368,7 +398,7 @@ namespace gev
       if (found)
         continue;
 
-      std::println("Extension NOT FOUND: {}", req);
+      _logger.warn("Extension {}: NOT FOUND", req);
     }
 
     instance_info.setPEnabledLayerNames(found_instance_layers);
@@ -429,7 +459,7 @@ namespace gev
         if (std::string_view(cur.extensionName.data()) == std::string_view(req))
         {
           found_device_extensions.push_back(req);
-          std::println("Device Extension     FOUND: {}", req);
+          _logger.debug("Device Extension {}: FOUND", req);
           found = true;
           break;
         }
@@ -437,7 +467,7 @@ namespace gev
       if (found)
         continue;
 
-      std::println("Device Extension NOT FOUND: {}", req);
+      _logger.warn("Device Extension {}: NOT FOUND", req);
     }
 
 
