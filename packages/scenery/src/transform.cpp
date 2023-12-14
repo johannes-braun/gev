@@ -2,68 +2,44 @@
 
 namespace gev::scenery
 {
-  rnu::mat4 transform::matrix() const
+  rnu::quat from_euler(rnu::vec3 euler)
   {
-    
+    float const roll = euler.x;
+    float const yaw = euler.y;
+    float const pitch = euler.z;
 
-    return rnu::translation(position) * rnu::rotation(rotation) * rnu::scale(scale);
+    float const cr = cos(roll * 0.5);
+    float const sr = sin(roll * 0.5);
+    float const cp = cos(pitch * 0.5);
+    float const sp = sin(pitch * 0.5);
+    float const cy = cos(yaw * 0.5);
+    float const sy = sin(yaw * 0.5);
+
+    rnu::quat q;
+    q.w = cr * cp * cy + sr * sp * sy;
+    q.x = sr * cp * cy - cr * sp * sy;
+    q.y = cr * sp * cy + sr * cp * sy;
+    q.z = cr * cp * sy - sr * sp * cy;
+    return q;
   }
 
-  void transform::set_matrix(rnu::mat4 mat) {
-    const float mat3w = mat[3].w == 0 ? 1.f : mat[3].w;
-    rnu::vec3 ax(mat[0]);
-    rnu::vec3 ay(mat[1]);
-    rnu::vec3 az(mat[2]);
-    position = mat[3];
-    position.x /= mat3w;
-    position.y /= mat3w;
-    position.z /= mat3w;
+  rnu::vec3 to_euler(rnu::quat q)
+  {
+    rnu::vec3 r;
+    float const sinr_cosp = 2 * (q.w * q.x + q.y * q.z);
+    float const cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y);
+    r.x = std::atan2(sinr_cosp, cosr_cosp);
 
-    ax = ax / rnu::vec3(scale.x = rnu::norm(ax));
-    ay = ay / rnu::vec3(scale.y = rnu::norm(ay));
-    az = az / rnu::vec3(scale.z = rnu::norm(az));
+    // pitch (y-axis rotation)
+    float const sinp = std::sqrt(1 + 2 * (q.w * q.y - q.x * q.z));
+    float const cosp = std::sqrt(1 - 2 * (q.w * q.y - q.x * q.z));
+    r.z = 2 * std::atan2(sinp, cosp) - std::numbers::pi_v<float> / 2;
 
-    const float m00 = ax.x;
-    const float m11 = ay.y;
-    const float m22 = az.z;
-    const float m01 = ax.y;
-    const float m10 = ay.x;
-    const float m02 = ax.z;
-    const float m20 = az.x;
-    const float m12 = ay.z;
-    const float m21 = az.y;
-    float t = 0;
-    if (m22 < 0)
-    {
-      if (m00 > m11)
-      {
-        t = 1 + m00 - m11 - m22;
-        rotation = rnu::quat(m12 - m21, t, m01 + m10, m20 + m02);
-      }
-      else
-      {
-        t = 1 - m00 + m11 - m22;
-        rotation = rnu::quat(m20 - m02, m01 + m10, t, m12 + m21);
-      }
-    }
-    else
-    {
-      if (m00 < -m11)
-      {
-        t = 1 - m00 - m11 + m22;
-        rotation = rnu::quat(m01 - m10, m20 + m02, m12 + m21, t);
-      }
-      else
-      {
-        t = 1 + m00 + m11 + m22;
-        rotation = rnu::quat(t, m12 - m21, m20 - m02, m01 - m10);
-      }
-    }
-    const float half_t_sqrt = 0.5f / rnu::sqrt(t);
-    rotation.w *= half_t_sqrt;
-    rotation.x *= half_t_sqrt;
-    rotation.y *= half_t_sqrt;
-    rotation.z *= half_t_sqrt;
+    // yaw (z-axis rotation)
+    float const siny_cosp = 2 * (q.w * q.z + q.x * q.y);
+    float const cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
+    r.y = std::atan2(siny_cosp, cosy_cosp);
+    return r;
   }
 
   transform interpolate(transform a, transform const& b, float t)

@@ -36,7 +36,7 @@ namespace gev
   class descriptor_allocator
   {
   public:
-    descriptor_allocator(int size = 100);
+    descriptor_allocator(int size = 300);
 
     std::vector<vk::DescriptorSet> allocate(vk::DescriptorSetLayout layout, std::uint32_t count);
     vk::DescriptorSet allocate(vk::DescriptorSetLayout layout);

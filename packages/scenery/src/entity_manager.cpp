@@ -4,9 +4,28 @@ namespace gev::scenery
 {
   std::shared_ptr<entity> entity_manager::instantiate(std::shared_ptr<entity> parent)
   {
-    auto r = std::make_shared<entity>();
+    return instantiate(~0, std::move(parent));
+  }
+
+  std::shared_ptr<entity> entity_manager::instantiate(std::size_t id, std::shared_ptr<entity> parent)
+  {
+    auto r = std::make_shared<entity>(id);
     add_to_parent(r, parent);
     return r;
+  }
+
+  std::shared_ptr<entity> entity_manager::find_by_id(std::size_t id)
+  {
+    if (id == ~0)
+      return nullptr;
+
+    for (auto const& c : _root_entities)
+    {
+      auto const found = c->find_by_id(id);
+      if (found)
+        return found;
+    }
+    return nullptr;
   }
 
   void entity_manager::reparent(std::shared_ptr<entity> const& target, std::shared_ptr<entity> new_parent)
@@ -26,7 +45,7 @@ namespace gev::scenery
     {
       auto const parent = target->_parent.lock();
       // this was not a root node. remove from parent's children list
-      parent->_children.erase(std::remove(begin(_root_entities), end(_root_entities), target));
+      parent->_children.erase(std::remove(begin(parent->_children), end(parent->_children), target));
     }
     target->_parent.reset();
   }

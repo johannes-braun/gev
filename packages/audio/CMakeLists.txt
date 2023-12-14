@@ -23,4 +23,7 @@ target_link_libraries(${GEV_CURRENT_LIBRARY} PUBLIC
   MPG123::libmpg123)
 target_sources(${GEV_CURRENT_LIBRARY} PRIVATE
   "src/audio.cpp"
-  "src/audio_host.cpp" "src/sound.cpp" "src/playback.cpp" "src/source_allocator.cpp")
+  "src/audio_host.cpp" 
+  "src/sound.cpp"
+  "src/playback.cpp"
+  "src/source_allocator.cpp")

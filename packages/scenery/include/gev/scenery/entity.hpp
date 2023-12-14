@@ -15,6 +15,8 @@ namespace gev::scenery
   public:
     transform local_transform;
 
+    entity(std::size_t id);
+
     void add(std::shared_ptr<component> c);
     
     template<typename T>
@@ -29,11 +31,16 @@ namespace gev::scenery
     }
 
     template<typename T, typename... Args>
-    void emplace(Args&&... args)
+    std::shared_ptr<T> emplace(Args&&... args)
     {
-      add(std::make_shared<T>(std::forward<Args>(args)...));
+      auto component = std::make_shared<T>(std::forward<Args>(args)...);
+      add(component);
+      return component;
     }
 
+    std::shared_ptr<entity> find_by_id(std::size_t id);
+
+    std::size_t id() const;
     void spawn() const;
     void early_update() const;
     void update() const;
@@ -44,6 +51,7 @@ namespace gev::scenery
     transform const& global_transform() const;
 
   private:
+    std::size_t _id;
     std::weak_ptr<entity> _parent;
 
     transform _global_transform;

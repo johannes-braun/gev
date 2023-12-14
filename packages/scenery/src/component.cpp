@@ -2,8 +2,8 @@
 
 namespace gev::scenery
 {
-  std::shared_ptr<entity> const& component::owner() const
+  std::shared_ptr<entity> component::owner() const
   {
-    return _parent;
+    return _parent.lock();
   }
 }

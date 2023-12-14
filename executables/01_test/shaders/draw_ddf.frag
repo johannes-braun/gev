@@ -10,6 +10,7 @@ layout(set = 0, binding = 0) uniform Camera
 
 layout(set = 1, binding = 0) uniform Bounds
 {
+  mat4 inverse_transform;
   vec4 bmin;
   vec4 bmax;
 } bounds;
@@ -18,8 +19,8 @@ layout(set = 1, binding = 1) uniform sampler3D field;
 
 layout(location = 0) out vec4 color;
 
-#define TRACE_PRECISION 0.001
-#define TRACE_STEPS 256
+#define TRACE_PRECISION 0.01
+#define TRACE_STEPS 128
 #define TRACE_NO_RESULT -1.f
 //#define WRITE_DEPTH
 
@@ -95,6 +96,10 @@ void main()
   direction_near /= direction_near.w;
   direction_far /= direction_far.w;
   vec3 direction = normalize(direction_far.xyz - direction_near.xyz);
+
+  
+  pos = (bounds.inverse_transform * vec4(pos, 1)).xyz;
+  direction = (bounds.inverse_transform * vec4(direction, 0)).xyz;
 
   float t = march(pos, direction);
   vec3 a = vec3(t);

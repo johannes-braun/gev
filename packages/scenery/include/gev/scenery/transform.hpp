@@ -1,21 +1,15 @@
 #pragma once
 
 #include <rnu/math/math.hpp>
+#include <rnu/math/transform.hpp>
 
 namespace gev::scenery
 {
-  class transform
-  {
-  public:
-    rnu::vec3 position = {};
-    rnu::quat rotation = { 1, 0, 0, 0 };
-    rnu::vec3 scale = { 1, 1, 1 };
+  using transform = rnu::transform<float>;
 
-    void set_matrix(rnu::mat4 mat);
-    rnu::mat4 matrix() const;
-  };
+  rnu::quat from_euler(rnu::vec3 euler);
+  rnu::vec3 to_euler(rnu::quat q);
 
   transform interpolate(transform a, transform const& b, float t);
-
   transform concat(transform a, transform const& b);
 }

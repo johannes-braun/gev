@@ -15,9 +15,9 @@ namespace gev::scenery
     virtual void late_update() {}
 
   public:
-    std::shared_ptr<entity> const& owner() const;
+    std::shared_ptr<entity> owner() const;
 
   private:
-    std::shared_ptr<entity> _parent;
+    std::weak_ptr<entity> _parent;
   };
 }

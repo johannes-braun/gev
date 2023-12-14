@@ -4,6 +4,17 @@
 
 namespace gev::scenery
 {
+  entity::entity(std::size_t id)
+    : _id(id)
+  {
+
+  }
+
+  std::size_t entity::id() const 
+  {
+    return _id;
+  }
+
   void entity::add(std::shared_ptr<component> c)
   {
     c->_parent = shared_from_this();
@@ -12,6 +23,18 @@ namespace gev::scenery
     std::sort(_components.begin(), _components.end(), [&](std::shared_ptr<component> const& lhs, std::shared_ptr<component> const& rhs) {
       return typeid(*lhs).before(typeid(*rhs));
       });
+  }
+
+
+  std::shared_ptr<entity> entity::find_by_id(std::size_t id)
+  {
+    if (id == _id)
+      return shared_from_this();
+
+    for (auto const& c : _children)
+      if (c->id() == id)
+        return c;
+    return nullptr;
   }
 
   void entity::spawn() const

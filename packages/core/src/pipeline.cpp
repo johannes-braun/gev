@@ -51,6 +51,27 @@ namespace gev
     return get(layout.get());
   }
 
+  simple_pipeline_builder& simple_pipeline_builder::dynamic_states(vk::ArrayProxy<vk::DynamicState> states) 
+  {
+    _dynamic_states.insert(end(_dynamic_states), states.begin(), states.end());
+    return *this;
+  }
+
+  simple_pipeline_builder& simple_pipeline_builder::stage(vk::ShaderStageFlagBits stage_flags, vk::UniqueShaderModule const& module, vk::SpecializationInfo const& spec, std::string name)
+  {
+    return stage(stage_flags, module.get(), spec, std::move(name));
+  }
+
+  simple_pipeline_builder& simple_pipeline_builder::stage(vk::ShaderStageFlagBits stage_flags, vk::ShaderModule module, vk::SpecializationInfo const& spec, std::string name)
+  {
+    vk::PipelineShaderStageCreateInfo& info = _stages.emplace_back();
+    _stage_names.push_back(std::move(name));
+    _stage_specializations.push_back(spec);
+    info.setModule(module).setStage(stage_flags).setPSpecializationInfo(std::bit_cast<vk::SpecializationInfo*>(
+      _stage_specializations.size()));
+    return *this;
+  }
+
   simple_pipeline_builder& simple_pipeline_builder::stage(vk::ShaderStageFlagBits stage_flags, vk::UniqueShaderModule const& module, std::string name)
   {
     return stage(stage_flags, module.get(), std::move(name));
@@ -61,7 +82,7 @@ namespace gev
     vk::PipelineShaderStageCreateInfo& info = _stages.emplace_back();
     _stage_names.push_back(std::move(name));
     info.setModule(module).setStage(stage_flags);
-    return *this;
+      return *this;
   }
 
   simple_pipeline_builder& simple_pipeline_builder::topology(vk::PrimitiveTopology top)
@@ -119,8 +140,16 @@ namespace gev
 
   vk::UniquePipeline simple_pipeline_builder::build()
   {
-    for(size_t i = 0; i < _stages.size(); ++i)
+    for (size_t i = 0; i < _stages.size(); ++i)
+    {
       _stages[i].pName = _stage_names[i].c_str();
+
+      auto const spec = std::bit_cast<std::size_t>(_stages[i].pSpecializationInfo);
+      if (spec == 0)
+        continue;
+
+      _stages[i].pSpecializationInfo = &_stage_specializations[spec - 1];
+    }
 
     vk::GraphicsPipelineCreateInfo info;
     info.setLayout(_layout);
@@ -151,11 +180,7 @@ namespace gev
     info.pDepthStencilState = &depth;
 
     vk::PipelineDynamicStateCreateInfo dyn;
-    auto const dynamic_states = {
-      vk::DynamicState::eScissor,
-      vk::DynamicState::eViewport
-    };
-    dyn.setDynamicStates(dynamic_states);
+    dyn.setDynamicStates(_dynamic_states);
     info.pDynamicState = &dyn;
 
     vk::PipelineInputAssemblyStateCreateInfo input;

@@ -9,6 +9,7 @@ namespace gev::scenery
   {
   public:
     std::shared_ptr<entity> instantiate(std::shared_ptr<entity> parent = nullptr);
+    std::shared_ptr<entity> instantiate(std::size_t id, std::shared_ptr<entity> parent = nullptr);
     void reparent(std::shared_ptr<entity>const& target, std::shared_ptr<entity> new_parent = nullptr);
 
     std::span<std::shared_ptr<entity> const> root_entities() const
@@ -21,6 +22,7 @@ namespace gev::scenery
     void update() const;
     void late_update() const;
     void apply_transform() const;
+    std::shared_ptr<entity> find_by_id(std::size_t id);
 
   private:
     void remove_from_parent(std::shared_ptr<entity>const& target);

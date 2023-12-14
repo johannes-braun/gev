@@ -1,5 +1,6 @@
 #pragma once
 
+#include <gev/service_locator.hpp>
 #include <gev/vma.hpp>
 #include <gev/window.hpp>
 #include <gev/image.hpp>
@@ -83,9 +84,11 @@ namespace gev
     vk::SurfaceKHR window_surface() const;
     vk::SurfaceFormat2KHR swapchain_format() const;
     vk::Format depth_format() const;
+    vk::Format select_format(vk::ArrayProxy<vk::Format const> candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) const;
     vk::SwapchainKHR swapchain() const;
     vk::Extent2D swapchain_size() const;
 
+    service_locator& services();
     logger& logger();
     audio::audio_host& audio_host() const;
 
@@ -97,6 +100,11 @@ namespace gev
   private:
     engine() = default;
     void start_impl(std::string const& title, int width, int height);
+
+    VkBool32 debug_message_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+      VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+      const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+      void* pUserData);
 
     vk::UniqueInstance create_instance(std::string const& title);
     vk::PhysicalDevice pick_physical_device();
@@ -117,6 +125,7 @@ namespace gev
     shared_allocator _allocator;
     gev::queues _queues;
     vk::Format _depth_format;
+    vk::UniqueDebugUtilsMessengerEXT _debug_messenger;
 
     frame _current_frame;
 
@@ -127,10 +136,11 @@ namespace gev
     vk::UniqueSwapchainKHR _swapchain;
     vk::Extent2D _swapchain_size;
     std::vector<per_swapchain_image> _per_swapchain_image;
-    std::function<void(int w, int h)> _callback;
+    std::vector<std::function<void(int w, int h)>> _resize_callbacks;
 
     vk::UniqueDescriptorPool _imgui_descriptor_pool;
     std::unique_ptr<audio::audio_host> _audio_host;
+    service_locator _services;
 
     ImGuiContext* _imgui_context = nullptr;
   };

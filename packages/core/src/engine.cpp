@@ -74,6 +74,11 @@ namespace gev
     throw std::runtime_error("failed to find supported format!");
   }
 
+  service_locator& engine::services()
+  {
+    return _services;
+  }
+
   void engine::start_impl(std::string const& title, int width, int height)
   {
     static class glfw_initializer {
@@ -102,6 +107,26 @@ namespace gev
     VULKAN_HPP_DEFAULT_DISPATCHER.init(&glfwGetInstanceProcAddress);
     _instance = create_instance(title);
     VULKAN_HPP_DEFAULT_DISPATCHER.init(*_instance);
+
+    _debug_messenger = _instance->createDebugUtilsMessengerEXTUnique(vk::DebugUtilsMessengerCreateInfoEXT()
+      .setMessageSeverity(
+        //vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
+        //vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
+        vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+        vk::DebugUtilsMessageSeverityFlagBitsEXT::eError
+      ).setMessageType(
+        vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+        vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
+        vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding |
+        vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance
+      ).setPfnUserCallback([](VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+        void* pUserData) -> VkBool32 {
+          auto* e = static_cast<engine*>(pUserData);
+          return e->debug_message_callback(messageSeverity, messageTypes, pCallbackData, pUserData);
+        }).setPUserData(this));
+
     _physical_device = pick_physical_device();
     _physical_device_properties = _physical_device.getProperties();
     _device = create_device();
@@ -150,12 +175,36 @@ namespace gev
     cfg.FontDataOwnedByAtlas = false;
     ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<std::uint8_t*>(rethink_sans), rethink_sans_length, 16, &cfg);
 
-    _depth_format = find_supported_format(_physical_device,
-      { vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint, vk::Format::eD16UnormS8Uint },
+    _depth_format = select_format({ vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint, vk::Format::eD16UnormS8Uint },
       vk::ImageTiling::eOptimal,
       vk::FormatFeatureFlagBits::eDepthStencilAttachment);
 
     _audio_host = audio::audio_host::create();
+  }
+
+  VkBool32 engine::debug_message_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData)
+  {
+    switch (messageSeverity)
+    {
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
+      _logger.debug("{}", pCallbackData->pMessage);
+      break;
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
+      _logger.log("{}", pCallbackData->pMessage);
+      break;
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+      _logger.warn("{}", pCallbackData->pMessage);
+      break;
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+      _logger.error("{}", pCallbackData->pMessage);
+      break;
+    default:
+      break;
+    }
+    return VK_FALSE;
   }
 
   frame const& engine::current_frame() const
@@ -275,9 +324,15 @@ namespace gev
   engine::~engine()
   {
     _device->waitIdle();
+    _services.clear();
     ImGui_ImplGlfw_Shutdown();
     ImGui_ImplVulkan_Shutdown();
     ImGui::DestroyContext(_imgui_context);
+  }
+
+  vk::Format engine::select_format(vk::ArrayProxy<vk::Format const> candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) const
+  {
+    return find_supported_format(_physical_device, candidates, tiling, features);
   }
 
   vk::Format engine::depth_format() const
@@ -292,7 +347,7 @@ namespace gev
 
   void engine::on_resized(std::function<void(int w, int h)> callback)
   {
-    _callback = std::move(callback);
+    _resize_callbacks.push_back(std::move(callback));
   }
 
   void engine::execute_once(std::function<void(vk::CommandBuffer c)> func, vk::Queue queue, vk::CommandPool pool, bool synchronize)
@@ -352,7 +407,7 @@ namespace gev
 
     std::vector required_instance_extensions{
       VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-        VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME
+      VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME
     };
     std::uint32_t num_glfw = 0;
     auto const** arr_glfw = glfwGetRequiredInstanceExtensions(&num_glfw);
@@ -686,8 +741,8 @@ namespace gev
     _queues.graphics.submit2(submit, fence.get());
     [[maybe_unused]] auto const wait_result = _device->waitForFences(fence.get(), true, std::numeric_limits<uint32_t>::max());
 
-    if (_callback)
-      _callback(_swapchain_size.width, _swapchain_size.height);
+    for (auto& callback : _resize_callbacks)
+      callback(_swapchain_size.width, _swapchain_size.height);
   }
 
   audio::audio_host& engine::audio_host() const

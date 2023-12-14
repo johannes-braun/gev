@@ -5,12 +5,11 @@ endif()
 
 add_executable(01_test 
   "01_test.cpp" 
-  "camera.cpp"
-  "object.cpp" 
-  "texture.cpp"
-  "ddf_generator.cpp"
+  "components/camera_component.cpp"
+  "components/camera_controller.cpp"
+  "components/renderer_component.cpp"
   ${WIN32_RESOURCES})
-target_link_libraries(01_test PRIVATE gev.core gev.scenery gev.imgui gev.audio)
+target_link_libraries(01_test PRIVATE gev.core gev.scenery gev.imgui gev.audio gev.game)
 add_custom_command(TARGET 01_test POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:01_test> $<TARGET_FILE_DIR:01_test>
   COMMAND_EXPAND_LISTS
@@ -22,8 +21,6 @@ add_custom_command(TARGET 01_test POST_BUILD
 
 compile_shaders(
   test_shaders
-  "shaders/shader.vert"
-  "shaders/shader.frag"
   "shaders/environment.vert"
   "shaders/environment.frag"
   "shaders/generate_distance_field.comp"

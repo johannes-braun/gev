@@ -19,6 +19,10 @@ namespace gev
     static simple_pipeline_builder get(vk::PipelineLayout layout);
     static simple_pipeline_builder get(vk::UniquePipelineLayout const& layout);
 
+    simple_pipeline_builder& dynamic_states(vk::ArrayProxy<vk::DynamicState> states);
+
+    simple_pipeline_builder& stage(vk::ShaderStageFlagBits stage_flags, vk::UniqueShaderModule const& module, vk::SpecializationInfo const& info, std::string name = "main");
+    simple_pipeline_builder& stage(vk::ShaderStageFlagBits stage_flags, vk::ShaderModule module, vk::SpecializationInfo const& info, std::string name = "main");
     simple_pipeline_builder& stage(vk::ShaderStageFlagBits stage_flags, vk::UniqueShaderModule const& module, std::string name = "main");
     simple_pipeline_builder& stage(vk::ShaderStageFlagBits stage_flags, vk::ShaderModule module, std::string name = "main");
 
@@ -37,7 +41,9 @@ namespace gev
   private:
     simple_pipeline_builder() = default;
 
+    std::vector<vk::DynamicState> _dynamic_states = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
     std::vector<std::string> _stage_names;
+    std::vector<vk::SpecializationInfo> _stage_specializations;
     vk::PipelineLayout _layout;
     std::vector<vk::PipelineShaderStageCreateInfo> _stages;
     std::vector<vk::VertexInputAttributeDescription> _attributes;

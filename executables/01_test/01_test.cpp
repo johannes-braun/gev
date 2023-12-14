@@ -1,7 +1,6 @@
-#include "camera.hpp"
-#include "object.hpp"
-#include "texture.hpp"
-#include "ddf_generator.hpp"
+#include "components/camera_component.hpp"
+#include "components/camera_controller.hpp"
+#include "components/renderer_component.hpp"
 
 #include <gev/engine.hpp>
 #include <gev/buffer.hpp>
@@ -14,6 +13,10 @@
 #include <gev/audio/audio.hpp>
 #include <gev/audio/sound.hpp>
 #include <gev/audio/playback.hpp>
+#include <gev/game/renderer.hpp>
+#include <gev/game/mesh_renderer.hpp>
+#include <gev/game/camera.hpp>
+#include <gev/game/distance_field_generator.hpp>
 
 #include <rnu/math/math.hpp>
 #include <rnu/obj.hpp>
@@ -22,129 +25,109 @@
 
 #include <test_shaders_files.hpp>
 
-struct render_attachments
-{
-  std::shared_ptr<gev::image> msaa_image;
-  vk::UniqueImageView msaa_view;
-  std::shared_ptr<gev::image> depth_image;
-  vk::UniqueImageView depth_view;
-};
+#include <random>
+#include <mdspan>
 
-class ddf_binder
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
+class mg_component : public gev::scenery::component
 {
 public:
-  ddf_binder()
-  {
-    _device_fields = std::make_unique<gev::buffer>(
-      VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
-      vk::BufferCreateInfo().setSharingMode(vk::SharingMode::eExclusive)
-      .setSize(256 * sizeof(distance_field))
-      .setUsage(vk::BufferUsageFlagBits::eStorageBuffer));
-
-    _host_fields.resize(256);
-    _device_fields->load_data<distance_field>(_host_fields);
-
-    _ddf_layout = gev::descriptor_layout_creator::get()
-      .bind(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eFragment)
-      .bind(1, vk::DescriptorType::eCombinedImageSampler, 256, vk::ShaderStageFlagBits::eFragment, vk::DescriptorBindingFlagBits::ePartiallyBound)
-      .build();
-
-    _descriptor = gev::engine::get().get_descriptor_allocator().allocate(_ddf_layout.get());
-    gev::update_descriptor(_descriptor, 0, vk::DescriptorBufferInfo()
-      .setBuffer(_device_fields->get_buffer())
-      .setOffset(0)
-      .setRange(_device_fields->size()), vk::DescriptorType::eStorageBuffer);
+  mg_component() {
+    _diffuse = std::make_shared<gev::game::texture>("res/grass.jpg");
+    _roughness = std::make_shared<gev::game::texture>("res/ground_roughness.jpg");
   }
 
-  void add(ddf const& d)
-  {
-    auto const index = _current_field++;
-    auto& field = _host_fields[index];
-    field.bounds_min = rnu::vec4(d.bounds().lower(), 1);
-    field.bounds_max = rnu::vec4(d.bounds().upper(), 1);
-    field.field_index = index;
+  void spawn() {
+    _renderer = owner()->get<renderer_component>();
 
-    _host_fields[index + 1].field_index = -1;
-
-    _device_fields->load_data<distance_field>(_host_fields);
-
-    gev::update_descriptor(_descriptor, 1, vk::DescriptorImageInfo()
-      .setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
-      .setImageView(d.image_view())
-      .setSampler(d.sampler()), vk::DescriptorType::eCombinedImageSampler,
-      index);
+    _renderer->set_mesh(std::make_shared<gev::game::mesh>(_tri));
+    _renderer->set_material(std::make_shared<gev::game::material>());
+    _renderer->get_material()->load_diffuse(_diffuse);
+    _renderer->get_material()->load_roughness(_roughness);
+    _renderer->get_material()->set_two_sided(true);
   }
 
-  void bind(vk::CommandBuffer c, vk::PipelineLayout layout, int set_index)
+  void update()
   {
-    c.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout, set_index, _descriptor, nullptr);
-  }
+    ImGui::Begin("mg_c");
+    if (ImGui::Button("eh"))
+    {
+      _tri.indices.clear();
+      _tri.positions.clear();
+      _tri.normals.clear();
+      _tri.texcoords.clear();
 
-  vk::DescriptorSetLayout layout() const
-  {
-    return *_ddf_layout;
-  }
+      auto w = 0;
+      auto h = 0;
+      auto c = 0;
+      float* arr = stbi_loadf("res/heightmap.png", &w, &h, &c, 1);
+      std::vector<float> hs(arr, arr + w * h);
+      STBI_FREE(arr);
 
-  vk::DescriptorSet descriptor() const
-  {
-    return _descriptor;
+      generate_mesh(hs, w, h, 10.0f, 0.3f);
+      _renderer->get_mesh()->load(_tri);
+    }
+    ImGui::End();
   }
 
 private:
-  struct distance_field
+
+  void generate_mesh(std::span<float> heights, int rx, int ry, float hscale, float scale)
   {
-    rnu::vec4 bounds_min;
-    rnu::vec4 bounds_max;
-    int field_index = -1;
+    for (int i = 0; i < rx; ++i)
+    {
+      for (int j = 0; j < ry; ++j)
+      {
+        auto const h = heights[i * ry + j] * hscale;
+        rnu::vec3 const p(i * scale, h, j * scale);
+        _tri.positions.push_back(p);
+        _tri.normals.emplace_back(0, 1, 0);
+        _tri.texcoords.emplace_back(i / float(rx), j / float(ry));
+      }
+    }
 
-    int _p0;
-    int _p1;
-    int _p2;
-  };
+    for (int i = 0; i < rx - 1; ++i)
+    {
+      for (int j = 0; j < ry - 1; ++j)
+      {
+        auto const idx00 = std::uint32_t(i * ry + j);
+        auto const idx10 = std::uint32_t((i + 1) * ry + j);
+        auto const idx01 = std::uint32_t(i * ry + (j + 1));
+        auto const idx11 = std::uint32_t((i + 1) * ry + (j + 1));
 
-  vk::UniqueDescriptorSetLayout _ddf_layout;
-  vk::DescriptorSet _descriptor;
-  std::unique_ptr<gev::buffer> _device_fields;
-  std::vector<distance_field> _host_fields;
-  int _current_field = 0;
-};
+        _tri.indices.insert(_tri.indices.end(), {
+          idx00, idx10, idx01,
+          idx01, idx10, idx11
+          });
 
-class simple_material
-{
-public:
-  simple_material(vk::DescriptorSetLayout layout)
-  {
-    _texture_descriptor = gev::engine::get().get_descriptor_allocator().allocate(layout);
+        rnu::vec3 const p00 = _tri.positions[idx00];
+        rnu::vec3 const p01 = _tri.positions[idx01];
+        rnu::vec3 const p10 = _tri.positions[idx10];
+        rnu::vec3 const p11 = _tri.positions[idx11];
+
+        _tri.normals[idx00] = rnu::cross(p10 - p00, p01 - p00);
+        _tri.normals[idx11] = rnu::cross(p01 - p11, p10 - p11);
+      }
+    }
+
+    auto const prx_a = _tri.positions[(rx - 1) * ry];
+    auto const prx_b = _tri.positions[(rx - 1) * ry + 1];
+    auto const prx_c = _tri.positions[(rx - 2) * ry];
+    _tri.normals[(rx - 1) * ry] = rnu::cross(prx_b - prx_a, prx_c - prx_a);
+
+    auto const pry_a = _tri.positions[ry - 1];
+    auto const pry_b = _tri.positions[ry - 2];
+    auto const pry_c = _tri.positions[2 * ry - 1];
+    _tri.normals[ry - 1] = rnu::cross(pry_b - pry_a, pry_c - pry_a);
   }
 
-  void load_diffuse(std::shared_ptr<texture> dt)
-  {
-    _diffuse = std::move(dt);
-    _diffuse->bind(_texture_descriptor, 0);
-  }
-
-  void load_roughness(std::shared_ptr<texture> rt)
-  {
-    _roughness = std::move(rt);
-    _roughness->bind(_texture_descriptor, 1);
-  }
-
-  void bind(vk::CommandBuffer c, vk::PipelineLayout layout, std::uint32_t index)
-  {
-    c.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout, index, _texture_descriptor, nullptr);
-  }
-
-private:
-  vk::DescriptorSet _texture_descriptor;
-  std::shared_ptr<texture> _diffuse;
-  std::shared_ptr<texture> _roughness;
-};
-
-struct entity
-{
-  std::shared_ptr<object> obj;
-  std::shared_ptr<simple_material> mtl;
+  int _xpos = 0;
+  rnu::triangulated_object_t _tri;
+  std::shared_ptr<renderer_component> _renderer;
+  std::shared_ptr<gev::game::texture> _diffuse;
+  std::shared_ptr<gev::game::texture> _roughness;
 };
 
 class test_component : public gev::scenery::component
@@ -159,12 +142,8 @@ public:
   virtual void update()
   {
     if (_playback)
-    {
       if (!_playback->is_playing())
-      {
         _playback.reset();
-      }
-    }
   }
 
   void play_sound()
@@ -177,9 +156,14 @@ public:
   {
     ImGui::Text("Name: %s", _name.c_str());
 
-    ImGui::InputFloat3("Position", owner()->local_transform.position.data());
-    ImGui::InputFloat4("Orientation", owner()->local_transform.rotation.data());
-    ImGui::InputFloat3("Scale", owner()->local_transform.scale.data());
+    ImGui::DragFloat3("Position", owner()->local_transform.position.data(), 0.01);
+
+    auto euler = gev::scenery::to_euler(owner()->local_transform.rotation);
+    if (ImGui::DragFloat3("Orientation", euler.data(), 0.01)) {
+      owner()->local_transform.rotation = gev::scenery::from_euler(euler);
+    }
+
+    ImGui::DragFloat3("Scale", owner()->local_transform.scale.data(), 0.01);
 
     auto const global = owner()->global_transform();
     ImGui::Text("Global:");
@@ -187,7 +171,7 @@ public:
     ImGui::Text("Orientation: (%.3f, %.3f, %.3f, %.3f)", global.rotation.w, global.rotation.x, global.rotation.y, global.rotation.z);
     ImGui::Text("Scale: (%.3f, %.3f, %.3f)", global.scale.x, global.scale.y, global.scale.z);
 
-    if (_playback) 
+    if (_playback)
     {
       ImGui::Text("Playing...");
       auto l = _playback->is_looping();
@@ -223,34 +207,14 @@ private:
 class test01
 {
 public:
-  struct stopper {
-    ~stopper() {
-      gev::engine::reset();
-    }
-  } stop;
-
-  std::shared_ptr<gev::audio::sound> _sound;
+  vk::SampleCountFlagBits _render_samples = vk::SampleCountFlagBits::e4;
 
   test01() {
-    gev::engine::get().on_resized([this](auto w, auto h) {
-      _per_index.reset(); });
     gev::engine::get().start("Test 01", 1280, 720);
 
-    _sound = gev::engine::get().audio_host().load_file("res/sound.ogg");
-
-    auto e = _entity_manager.instantiate();
-    e->emplace<test_component>("Scene Root", _sound);
-    auto ch01 = _entity_manager.instantiate(e);
-    ch01->emplace<test_component>("Child 01", _sound);
-    auto ch02 = _entity_manager.instantiate(e);
-    ch02->emplace<test_component>("Child 02", _sound);
-    auto unnamed = _entity_manager.instantiate(e);
-    auto e2 = _entity_manager.instantiate();
-    e2->emplace<test_component>("Other Root", _sound);
-    auto och01 = _entity_manager.instantiate(e2);
-    och01->emplace<test_component>("Other Child 01", _sound);
-    auto och02 = _entity_manager.instantiate(e2);
-    och02->emplace<test_component>("Other Child 02", _sound);
+    gev::engine::get().services().register_service<gev::game::renderer>(_render_samples);
+    gev::engine::get().services().register_service<gev::game::mesh_renderer>(_render_samples);
+    gev::engine::get().services().register_service<gev::game::distance_field_generator>();
   }
 
   std::shared_ptr<gev::scenery::entity> _selected_entity;
@@ -283,7 +247,7 @@ public:
         }
       }
 
-      if(elem)
+      if (elem)
       {
         draw_component_tree(e->children());
         ImGui::TreePop();
@@ -293,126 +257,116 @@ public:
 
   int start()
   {
-    _per_index.set_generator([&](int i) {
-      auto const size = gev::engine::get().swapchain_size();
-      render_attachments idx;
-      idx.depth_image = std::make_shared<gev::image>(vk::ImageCreateInfo()
-        .setFormat(gev::engine::get().depth_format())
-        .setArrayLayers(1)
-        .setExtent({ size.width, size.height, 1 })
-        .setImageType(vk::ImageType::e2D)
-        .setInitialLayout(vk::ImageLayout::eUndefined)
-        .setMipLevels(1)
-        .setSamples(vk::SampleCountFlagBits::e4)
-        .setTiling(vk::ImageTiling::eOptimal)
-        .setSharingMode(vk::SharingMode::eExclusive)
-        .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment));
-      idx.depth_view = idx.depth_image->create_view(vk::ImageViewType::e2D);
+    auto mesh_renderer = gev::engine::get().services().resolve<gev::game::mesh_renderer>();
+    auto distance_field_generator = gev::engine::get().services().resolve<gev::game::distance_field_generator>();
 
-      idx.msaa_image = std::make_shared<gev::image>(vk::ImageCreateInfo()
-        .setFormat(gev::engine::get().swapchain_format().surfaceFormat.format)
-        .setArrayLayers(1)
-        .setExtent({ size.width, size.height, 1 })
-        .setImageType(vk::ImageType::e2D)
-        .setInitialLayout(vk::ImageLayout::eUndefined)
-        .setMipLevels(1)
-        .setSamples(vk::SampleCountFlagBits::e4)
-        .setTiling(vk::ImageTiling::eOptimal)
-        .setSharingMode(vk::SharingMode::eExclusive)
-        .setUsage(vk::ImageUsageFlagBits::eColorAttachment));
-      idx.msaa_view = idx.msaa_image->create_view(vk::ImageViewType::e2D);
-      return idx;
-      });
+    _environment_pipeline_layout = gev::create_pipeline_layout(mesh_renderer->camera_set_layout());
 
-    _camera = std::make_unique<camera>();
+    rnu::triangulated_object_t tri_mesh;
+    tri_mesh.indices = {
+      0, 1, 2,
+      2, 1, 3
+    };
+    tri_mesh.positions = {
+      { -5, 0, -5 },
+      { -5, 0, 5 },
+      { 5, 0, -5 },
+      { 5, 0, 5 },
+    };
+    tri_mesh.normals = {
+      {0, 1, 0},
+      {0, 1, 0},
+      {0, 1, 0},
+      {0, 1, 0},
+    };
+    tri_mesh.texcoords = {
+      {0, 0},
+      {0, 1},
+      {1, 0},
+      {1, 1},
+    };
 
-    _ddf_binder = std::make_unique<ddf_binder>();
+    auto const sound = gev::engine::get().audio_host().load_file("res/sound.ogg");
 
-    _material_set_layout = gev::descriptor_layout_creator::get()
-      .bind(0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eAllGraphics)
-      .bind(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eAllGraphics)
-      .build();
-    _main_pipeline_layout = gev::create_pipeline_layout({
-      _camera->get_descriptor_set_layout(),
-      _material_set_layout.get(),
-      _ddf_binder->layout(),
-      });
-    _environment_pipeline_layout = gev::create_pipeline_layout(_camera->get_descriptor_set_layout());
+    auto object0 = std::make_shared<gev::game::mesh>("res/bunny.obj");
+    mesh_renderer->generate_distance_field(object0, *distance_field_generator, 48);
+    auto object1 = std::make_shared<gev::game::mesh>(tri_mesh);
+    mesh_renderer->generate_distance_field(object1, *distance_field_generator, 48);
 
-    {
-      auto& e = _entities.emplace_back();
-      e.obj = std::make_shared<object>("res/bunny.obj");
-      e.mtl = std::make_shared<simple_material>(*_material_set_layout);
-      e.mtl->load_diffuse(std::make_unique<texture>("res/dirt.png"));
-      e.mtl->load_roughness(std::make_unique<texture>("res/roughness.jpg"));
-    }
+    auto const texture_dirt = std::make_shared<gev::game::texture>("res/dirt.png");
+    auto const texture_roughness = std::make_shared<gev::game::texture>("res/roughness.jpg");
+    auto const texture_grass = std::make_shared<gev::game::texture>("res/grass.jpg");
+    auto const texture_ground_roughness = std::make_shared<gev::game::texture>("res/ground_roughness.jpg");
 
-    {
-      auto& e = _entities.emplace_back();
-      e.obj = std::make_shared<object>("res/torus.obj");
-      e.mtl = std::make_shared<simple_material>(*_material_set_layout);
-      e.mtl->load_diffuse(std::make_unique<texture>("res/dirt.png"));
-      e.mtl->load_roughness(std::make_unique<texture>("res/ground_roughness.jpg"));
-    }
+    auto e = _entity_manager.instantiate();
+    e->emplace<test_component>("Scene Root", sound);
 
-    {
-      auto& e = _entities.emplace_back();
-      e.obj = std::make_shared<object>("res/plane.obj");
-      e.mtl = std::make_shared<simple_material>(*_material_set_layout);
-      e.mtl->load_diffuse(std::make_unique<texture>("res/grass.jpg"));
-      e.mtl->load_roughness(std::make_unique<texture>("res/ground_roughness.jpg"));
-    }
+    auto ch01 = _entity_manager.instantiate(e);
+    ch01->emplace<test_component>("Child 01", sound);
+    auto r = ch01->emplace<renderer_component>();
+    r->set_mesh(object0);
+    auto const mtl = std::make_shared<gev::game::material>();
+    mtl->load_diffuse(texture_dirt);
+    mtl->load_roughness(texture_roughness);
+    r->set_material(mtl);
 
-    _ddf_gen = std::make_unique<ddf_generator>(_camera->get_descriptor_set_layout());
-    for (auto const& e : _entities)
-    {
-      _ddf_binder->add(*_ddfs.emplace_back(_ddf_gen->generate(*e.obj, 32)));
-    }
+    auto ch02 = _entity_manager.instantiate(e);
+    ch02->emplace<test_component>("Child 02", sound);
+    auto r2 = ch02->emplace<renderer_component>();
+    r2->set_mesh(object1);
+    auto const mtl2 = std::make_shared<gev::game::material>();
+    mtl2->load_diffuse(texture_grass);
+    mtl2->load_roughness(texture_ground_roughness);
+    r2->set_material(mtl2);
 
+    auto ch03 = _entity_manager.instantiate(e);
+    ch03->emplace<test_component>("Child 03", sound);
+    ch03->emplace<renderer_component>();
+    ch03->emplace<mg_component>();
+
+    auto unnamed = _entity_manager.instantiate(e);
+    auto e2 = _entity_manager.instantiate();
+    e2->emplace<test_component>("Camera", sound);
+    e2->emplace<camera_component>();
+    e2->emplace<camera_controller>();
+    e2->local_transform.position = rnu::vec3(0, 2, 5);
+
+    auto och01 = _entity_manager.instantiate(e2);
+    och01->emplace<test_component>("Other Child 01", sound);
+
+    auto och02 = _entity_manager.instantiate(e2);
+    och02->emplace<test_component>("Other Child 02", sound);
+    _entity_manager.reparent(och02, och01);
     create_pipelines();
 
     _entity_manager.spawn();
-
     return gev::engine::get().run([this](auto&& f) { return loop(f); });
   }
 
   void create_pipelines()
   {
-    _main_pipeline.reset();
+    gev::engine::get().device().waitIdle();
+    auto renderer = gev::engine::get().services().resolve<gev::game::renderer>();
+    auto mesh_renderer = gev::engine::get().services().resolve<gev::game::mesh_renderer>();
+    renderer->set_samples(_render_samples);
+    mesh_renderer->set_samples(_render_samples);
+
     _environment_pipeline.reset();
-
-    _ddf_gen->recreate_pipelines();
-
-    auto vertex_shader = gev::create_shader(gev::load_spv(test_shaders::shaders::shader_vert));
-    auto fragment_shader = gev::create_shader(gev::load_spv(test_shaders::shaders::shader_frag));
-    _main_pipeline = gev::simple_pipeline_builder::get(_main_pipeline_layout)
-      .stage(vk::ShaderStageFlagBits::eVertex, vertex_shader)
-      .stage(vk::ShaderStageFlagBits::eFragment, fragment_shader)
-      .attribute(0, 0, vk::Format::eR32G32B32Sfloat)
-      .attribute(1, 1, vk::Format::eR32G32B32Sfloat)
-      .attribute(2, 2, vk::Format::eR32G32Sfloat)
-      .binding(0, sizeof(rnu::vec4))
-      .binding(1, sizeof(rnu::vec3))
-      .binding(2, sizeof(rnu::vec2))
-      .multisampling(vk::SampleCountFlagBits::e4)
-      .color_attachment(gev::engine::get().swapchain_format().surfaceFormat.format)
-      .depth_attachment(gev::engine::get().depth_format())
-      .stencil_attachment(gev::engine::get().depth_format())
-      .build();
-
     auto env_vertex_shader = gev::create_shader(gev::load_spv(test_shaders::shaders::environment_vert));
     auto env_fragment_shader = gev::create_shader(gev::load_spv(test_shaders::shaders::environment_frag));
     _environment_pipeline = gev::simple_pipeline_builder::get(_environment_pipeline_layout)
       .stage(vk::ShaderStageFlagBits::eVertex, env_vertex_shader)
       .stage(vk::ShaderStageFlagBits::eFragment, env_fragment_shader)
-      .multisampling(vk::SampleCountFlagBits::e4)
+      .multisampling(_render_samples)
       .color_attachment(gev::engine::get().swapchain_format().surfaceFormat.format)
       .build();
   }
 
 private:
-  bool loop(gev::frame const& frame)
+  bool ui_in_loop(gev::frame const& frame)
   {
+    auto renderer = gev::engine::get().services().resolve<gev::game::renderer>();
+
     _timer += frame.delta_time;
     _count++;
     if (_timer >= 0.3)
@@ -421,8 +375,6 @@ private:
       _count = 0;
       _timer = 0.0;
     }
-    _entity_manager.apply_transform();
-    _entity_manager.early_update();
 
     if (ImGui::Begin("Info"))
     {
@@ -450,9 +402,34 @@ private:
         else
         {
           glfwSetWindowMonitor(window, nullptr,
-            _position_before_fullscreen.x, _position_before_fullscreen.y, 
+            _position_before_fullscreen.x, _position_before_fullscreen.y,
             _size_before_fullscreen.x, _size_before_fullscreen.y, GLFW_DONT_CARE);
         }
+      }
+
+      if (ImGui::Button("1x AA"))
+      {
+        _render_samples = vk::SampleCountFlagBits::e1;
+        renderer->set_samples(_render_samples);
+        create_pipelines();
+      }
+      if (ImGui::Button("2x AA"))
+      {
+        _render_samples = vk::SampleCountFlagBits::e2;
+        renderer->set_samples(_render_samples);
+        create_pipelines();
+      }
+      if (ImGui::Button("4x AA"))
+      {
+        _render_samples = vk::SampleCountFlagBits::e4;
+        renderer->set_samples(_render_samples);
+        create_pipelines();
+      }
+      if (ImGui::Button("8x AA"))
+      {
+        _render_samples = vk::SampleCountFlagBits::e8;
+        renderer->set_samples(_render_samples);
+        create_pipelines();
       }
 
       if (ImGui::Button("Close"))
@@ -473,122 +450,49 @@ private:
     if (_selected_entity && ImGui::Begin("Entity"))
     {
       auto nc = _selected_entity->get<test_component>();
-      if(nc) nc->ui();
+      if (nc) nc->ui();
       ImGui::End();
     }
+    return true;
+  }
 
-    auto const& index = _per_index[frame.frame_index];
-    auto const& size = gev::engine::get().swapchain_size();
-    auto const& c = frame.command_buffer;
+  bool loop(gev::frame const& frame)
+  {
+    auto mesh_renderer = gev::engine::get().services().resolve<gev::game::mesh_renderer>();
+    auto renderer = gev::engine::get().services().resolve<gev::game::renderer>();
+
+    if (!ui_in_loop(frame))
+      return false;
+
+    // PREPARE AND UPDATE SCENE
+    renderer->prepare_frame(frame);
+    mesh_renderer->prepare_frame(frame);
+    _entity_manager.apply_transform();
+    _entity_manager.early_update();
     _entity_manager.update();
-
-    frame.output_image->layout(c,
-      vk::ImageLayout::eColorAttachmentOptimal,
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-      vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite,
-      gev::engine::get().queues().graphics_family);
-    index.msaa_image->layout(c,
-      vk::ImageLayout::eColorAttachmentOptimal,
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-      vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite,
-      gev::engine::get().queues().graphics_family);
-    index.depth_image->layout(c,
-      vk::ImageLayout::eDepthStencilAttachmentOptimal,
-      vk::PipelineStageFlagBits2::eLateFragmentTests,
-      vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-      gev::engine::get().queues().graphics_family);
-
-    auto out_att = vk::RenderingAttachmentInfo()
-      .setImageLayout(vk::ImageLayout::eColorAttachmentOptimal)
-      .setClearValue(vk::ClearValue(std::array{ 0.24f, 0.21f, 0.35f, 1.0f }))
-      .setImageView(index.msaa_view.get())
-      .setResolveImageView(frame.output_view)
-      .setResolveImageLayout(vk::ImageLayout::eColorAttachmentOptimal)
-      .setResolveMode(vk::ResolveModeFlagBits::eAverage)
-      .setLoadOp(vk::AttachmentLoadOp::eDontCare)
-      .setStoreOp(vk::AttachmentStoreOp::eStore);
-    auto depth_attachment = vk::RenderingAttachmentInfo()
-      .setImageLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal)
-      .setClearValue(vk::ClearValue(vk::ClearDepthStencilValue(1.0f, 0)))
-      .setImageView(index.depth_view.get())
-      .setLoadOp(vk::AttachmentLoadOp::eClear)
-      .setStoreOp(vk::AttachmentStoreOp::eStore);
-
-    c.beginRendering(vk::RenderingInfo()
-      .setColorAttachments(out_att)
-      .setLayerCount(1)
-      .setRenderArea(vk::Rect2D({ 0, 0 }, { size.width, size.height })));
-    c.bindPipeline(vk::PipelineBindPoint::eGraphics, _environment_pipeline.get());
-    c.setViewport(0, vk::Viewport(0, 0, size.width, size.height, 0.f, 1.f));
-    c.setScissor(0, vk::Rect2D({ 0, 0 }, size));
-    _camera->bind(c, vk::PipelineBindPoint::eGraphics, _environment_pipeline_layout.get(), frame.frame_index);
-    c.draw(3, 1, 0, 0);
-    c.endRendering();
-
-    out_att.setLoadOp(vk::AttachmentLoadOp::eLoad);
-    c.beginRendering(vk::RenderingInfo()
-      .setColorAttachments(out_att)
-      .setPDepthAttachment(&depth_attachment)
-      .setLayerCount(1)
-      .setRenderArea(vk::Rect2D({ 0, 0 }, { size.width, size.height })));
-
-    bool const allow_input = !(ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard);
-    _camera->update(frame.delta_time, frame.frame_index, allow_input);
-
-    c.bindPipeline(vk::PipelineBindPoint::eGraphics, _main_pipeline.get());
-    c.setViewport(0, vk::Viewport(0, 0, size.width, size.height, 0.f, 1.f));
-    c.setScissor(0, vk::Rect2D({ 0, 0 }, size));
-
-    _camera->bind(c, vk::PipelineBindPoint::eGraphics, _main_pipeline_layout.get(), frame.frame_index);
-    _ddf_binder->bind(c, _main_pipeline_layout.get(), 2);
-
-    for (auto const& e : _entities)
-    {
-      e.mtl->bind(c, _main_pipeline_layout.get(), 1);
-      e.obj->draw(c);
-    }
-
-    c.endRendering();
-
-    if (_draw_ddfs)
-    {
-      depth_attachment.setLoadOp(vk::AttachmentLoadOp::eLoad);
-      c.beginRendering(vk::RenderingInfo()
-        .setColorAttachments(out_att)
-        .setPDepthAttachment(&depth_attachment)
-        .setLayerCount(1)
-        .setRenderArea(vk::Rect2D({ 0, 0 }, { size.width, size.height })));
-
-      for (auto const& d : _ddfs)
-      {
-        _ddf_gen->draw(c, *_camera, *d, frame.frame_index);
-      }
-      c.endRendering();
-    }
-
     _entity_manager.late_update();
+    mesh_renderer->finalize_enqueues(frame);
+
+    // ENVIRONMENT
+    renderer->begin_render(frame, false);
+    renderer->bind_pipeline(frame, _environment_pipeline.get(), _environment_pipeline_layout.get());
+    mesh_renderer->get_camera()->bind(frame, _environment_pipeline_layout.get());
+    frame.command_buffer.draw(3, 1, 0, 0);
+    renderer->end_render(frame);
+
+    // MESHES FROM render_component
+    mesh_renderer->render(*renderer, frame);
+
+    mesh_renderer->cleanup_frame();
     return true;
   }
 
   double _timer = 1.0;
   double _fps = 0.0;
   int _count = 0;
-  gev::per_frame<render_attachments> _per_index;
-
-  vk::UniqueDescriptorSetLayout _material_set_layout;
-
-  vk::UniquePipelineLayout _main_pipeline_layout;
-  vk::UniquePipeline _main_pipeline;
 
   vk::UniquePipelineLayout _environment_pipeline_layout;
   vk::UniquePipeline _environment_pipeline;
-
-  std::unique_ptr<camera> _camera;
-
-  std::vector<entity> _entities;
-  std::unique_ptr<ddf_generator> _ddf_gen;
-  std::unique_ptr<ddf_binder> _ddf_binder;
-  std::vector<std::unique_ptr<ddf>> _ddfs;
 
   bool _draw_ddfs = false;
   bool _fullscreen = false;
@@ -600,5 +504,12 @@ private:
 
 int main(int argc, char** argv)
 {
-  return test01{}.start();
+  int retval = 0;
+  {
+    test01 test{};
+    retval = test.start();
+  }
+
+  gev::engine::reset();
+  return retval;
 }

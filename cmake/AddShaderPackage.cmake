@@ -68,4 +68,8 @@ function(compile_shaders target_name)
   add_library(${target_name} INTERFACE)
   target_include_directories(${target_name} INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/include/${target_name})
   add_dependencies(${target_name} INTERFACE ${target_name}deps)
+  set_property(TARGET ${target_name}
+    PROPERTY SPIRV_FILES ${SPIRV_FILES})
+  set_property(TARGET ${target_name}
+    PROPERTY SPIRV_FILES_REL ${SPIRV_FILES_REL})
 endfunction()
