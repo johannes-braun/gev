@@ -1,9 +1,9 @@
 #pragma once
 
-#include <vector>
-#include <unordered_set>
-#include <memory>
 #include <gev/audio/audio.hpp>
+#include <memory>
+#include <unordered_set>
+#include <vector>
 
 namespace gev::audio
 {
@@ -27,4 +27,4 @@ namespace gev::audio
     std::unordered_set<audio_buffer_handle*> _used_buffers;
     std::vector<audio_buffer_handle*> _unused_buffers;
   };
-}
+}    // namespace gev::audio

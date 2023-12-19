@@ -3,8 +3,11 @@
 void camera_controller::spawn()
 {
   _camera = owner()->get<camera_component>();
-  if(auto c = _camera.lock())
-    c->set_main();
+  if (auto c = _camera.lock())
+  {
+    auto const r = gev::engine::get().services().resolve<gev::game::mesh_renderer>();
+    r->set_camera(c->camera());
+  }
 }
 
 void camera_controller::update()
@@ -17,27 +20,22 @@ void camera_controller::update()
   auto const delta = gev::engine::get().current_frame().delta_time;
   bool const allow_input = !(ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard);
 
-  _axises.to(rnu::vec3{
-          glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S),
-            glfwGetKey(window, GLFW_KEY_A) - glfwGetKey(window, GLFW_KEY_D),
-            glfwGetKey(window, GLFW_KEY_Q) - glfwGetKey(window, GLFW_KEY_E)
-    } *(5.f + 10 * glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)));
+  _axises.to(rnu::vec3{glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S),
+               glfwGetKey(window, GLFW_KEY_A) - glfwGetKey(window, GLFW_KEY_D),
+               glfwGetKey(window, GLFW_KEY_Q) - glfwGetKey(window, GLFW_KEY_E)} *
+    (5.f + 10 * glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)));
   _axises.update(20 * delta);
 
-  _base_camera.axis(
-    float(delta),
-    _axises.value().x,
-    _axises.value().y,
-    _axises.value().z);
+  _base_camera.axis(float(delta), _axises.value().x, _axises.value().y, _axises.value().z);
 
   double mx, my;
   glfwGetCursorPos(window, &mx, &my);
   if (!_down && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) && allow_input)
   {
-    _last_cursor_position = { mx, my };
-    _dst_cursor_offset = { mx, my };
+    _last_cursor_position = {mx, my};
+    _dst_cursor_offset = {mx, my};
     _down = true;
-    _cursor = rnu::smooth(rnu::vec2{ mx, my });
+    _cursor = rnu::smooth(rnu::vec2{mx, my});
   }
   else if (!allow_input || (_down && !glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT)))
   {
@@ -56,9 +54,15 @@ void camera_controller::update()
   }
   _cursor.update(20 * delta);
 
-  _base_camera.mouse(_cursor.value().x,
-    _cursor.value().y, !_cursor.finished());
+  _base_camera.mouse(_cursor.value().x, _cursor.value().y, !_cursor.finished());
 
   owner()->local_transform.position = _base_camera.position();
   owner()->local_transform.rotation = _base_camera.rotation();
+
+  if (!_camera.expired())
+  {
+    auto const size = gev::engine::get().swapchain_size();
+    _camera.lock()->camera()->set_projection(
+      rnu::cameraf::projection(rnu::radians(60.0f), size.width / float(size.height), 0.01f, 1000.0f, false, true));
+  }
 }

@@ -22,9 +22,9 @@ namespace gev::audio
   {
     alcMakeContextCurrent(_context);
   }
-  
+
   std::shared_ptr<sound> audio_host_impl::load_file(std::filesystem::path const& path) const
   {
     return std::shared_ptr<sound>(new sound(_source_allocator, path));
   }
-}
+}    // namespace gev::audio

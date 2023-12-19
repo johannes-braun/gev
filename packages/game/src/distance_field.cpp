@@ -1,5 +1,5 @@
-#include <gev/game/distance_field.hpp>
 #include <gev/engine.hpp>
+#include <gev/game/distance_field.hpp>
 
 namespace gev::game
 {
@@ -8,19 +8,19 @@ namespace gev::game
   {
     _image_view = _image->create_view(vk::ImageViewType::e3D);
 
-    _sampler = gev::engine::get().device().createSamplerUnique(vk::SamplerCreateInfo()
-      .setAddressModeU(vk::SamplerAddressMode::eClampToEdge)
-      .setAddressModeV(vk::SamplerAddressMode::eClampToEdge)
-      .setAddressModeW(vk::SamplerAddressMode::eClampToEdge)
-      .setAnisotropyEnable(false)
-      .setCompareEnable(false)
-      .setMagFilter(vk::Filter::eLinear)
-      .setMinFilter(vk::Filter::eLinear)
-      .setMipmapMode(vk::SamplerMipmapMode::eNearest)
-      .setUnnormalizedCoordinates(false)
-      .setMinLod(0)
-      .setMaxLod(1000)
-    );
+    _sampler = gev::engine::get().device().createSamplerUnique(
+      vk::SamplerCreateInfo()
+        .setAddressModeU(vk::SamplerAddressMode::eClampToEdge)
+        .setAddressModeV(vk::SamplerAddressMode::eClampToEdge)
+        .setAddressModeW(vk::SamplerAddressMode::eClampToEdge)
+        .setAnisotropyEnable(false)
+        .setCompareEnable(false)
+        .setMagFilter(vk::Filter::eLinear)
+        .setMinFilter(vk::Filter::eLinear)
+        .setMipmapMode(vk::SamplerMipmapMode::eNearest)
+        .setUnnormalizedCoordinates(false)
+        .setMinLod(0)
+        .setMaxLod(1000));
   }
 
   std::shared_ptr<gev::image> const& distance_field::image() const
@@ -42,4 +42,4 @@ namespace gev::game
   {
     return _sampler.get();
   }
-}
+}    // namespace gev::game

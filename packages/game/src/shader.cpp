@@ -1,0 +1,138 @@
+#include <gev/engine.hpp>
+#include <gev/game/layouts.hpp>
+#include <gev/game/shader.hpp>
+#include <gev/pipeline.hpp>
+#include <gev_game_shaders_files.hpp>
+#include <rnu/math/math.hpp>
+
+namespace gev::game
+{
+  shader::shader()
+  {
+    _pipelines.resize(std::size_t(pass_id::num_passes));
+  }
+
+  void shader::invalidate()
+  {
+    _force_rebuild = true;
+  }
+
+  void shader::set_samples(vk::SampleCountFlagBits samples)
+  {
+    if (samples != _render_samples)
+    {
+      _render_samples = samples;
+      invalidate();
+    }
+  }
+
+  void shader::bind(vk::CommandBuffer c, pass_id pass)
+  {
+    if (_force_rebuild || !_layout)
+    {
+      _pipelines.clear();
+      _pipelines.resize(std::size_t(pass_id::num_passes));
+      _force_rebuild = false;
+      _layout = rebuild_layout();
+    }
+
+    if (!_pipelines[std::size_t(pass)])
+    {
+      _pipelines[std::size_t(pass)] = rebuild(pass);
+    }
+
+    c.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline(pass));
+    for (auto const& [i, set] : _global_bindings)
+      attach(c, set, i);
+  }
+
+  vk::Pipeline shader::pipeline(pass_id pass) const
+  {
+    return _pipelines[std::size_t(pass)].get();
+  }
+
+  vk::PipelineLayout shader::layout() const
+  {
+    return _layout.get();
+  }
+
+  vk::SampleCountFlagBits shader::render_samples() const
+  {
+    return _render_samples;
+  }
+
+  void shader::attach_always(vk::DescriptorSet set, std::uint32_t index)
+  {
+    _global_bindings.emplace_back(index, set);
+  }
+
+  void shader::attach(vk::CommandBuffer c, vk::DescriptorSet set, std::uint32_t index)
+  {
+    c.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, _layout.get(), index, set, nullptr);
+  }
+
+  class default_shader : public shader
+  {
+  public:
+    default_shader(bool is_skinned) : _skinned(is_skinned) {}
+
+  protected:
+    vk::UniquePipelineLayout rebuild_layout() override
+    {
+      if (_skinned)
+      {
+        auto const& default_layouts = layouts::defaults();
+        return gev::create_pipeline_layout({default_layouts.camera_set_layout(), default_layouts.material_set_layout(),
+          default_layouts.object_set_layout(), default_layouts.shadow_map_layout(),
+          default_layouts.skinning_set_layout()});
+      }
+      else
+      {
+        auto const& default_layouts = layouts::defaults();
+        return gev::create_pipeline_layout({default_layouts.camera_set_layout(), default_layouts.material_set_layout(),
+          default_layouts.object_set_layout(), default_layouts.shadow_map_layout()});
+      }
+    }
+
+    vk::UniquePipeline rebuild(pass_id pass) override
+    {
+      auto const vertex_shader = _skinned ?
+        create_shader(load_spv(gev_game_shaders::shaders::shader2_rig_vert)) :
+        create_shader(load_spv(gev_game_shaders::shaders::shader2_vert));
+      auto const fragment_shader = create_shader(load_spv(gev_game_shaders::shaders::shader2_frag));
+
+      vk::SpecializationMapEntry pass_id(0, 0, sizeof(int));
+      vk::SpecializationMapEntry const entries[] = {pass_id};
+      int const pass_values[] = {int(std::size_t(pass))};
+      vk::SpecializationInfo info;
+      info.setMapEntries(entries);
+      info.setData<int>(pass_values);
+
+      auto builder =
+        gev::simple_pipeline_builder::get(layout())
+          .stage(vk::ShaderStageFlagBits::eVertex, vertex_shader, info)
+          .stage(vk::ShaderStageFlagBits::eFragment, fragment_shader, info)
+          .depth_attachment(gev::engine::get().depth_format())
+          .stencil_attachment(gev::engine::get().depth_format())
+          .dynamic_states({vk::DynamicState::eCullMode, vk::DynamicState::eRasterizationSamplesEXT,
+            vk::DynamicState::eVertexInputEXT});
+
+      if (pass == pass_id::forward)
+        builder.color_attachment(gev::engine::get().swapchain_format().surfaceFormat.format);
+      return builder.build();
+    }
+
+  private:
+    bool _skinned = false;
+  };
+
+  std::shared_ptr<shader> shader::make_default()
+  {
+    return std::make_shared<default_shader>(false);
+  }
+
+  std::shared_ptr<shader> shader::make_skinned()
+  {
+    return std::make_shared<default_shader>(true);
+  }
+}    // namespace gev::game

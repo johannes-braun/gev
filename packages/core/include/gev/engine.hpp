@@ -1,19 +1,21 @@
 #pragma once
 
+// clang-format off
+#include <vulkan/vulkan.hpp>
+#include <GLFW/glfw3.h>
+// clang-format on
+
+#include <any>
+#include <functional>
+#include <gev/audio/audio.hpp>
+#include <gev/descriptors.hpp>
+#include <gev/image.hpp>
+#include <gev/imgui/imgui.h>
+#include <gev/logger.hpp>
 #include <gev/service_locator.hpp>
 #include <gev/vma.hpp>
 #include <gev/window.hpp>
-#include <gev/image.hpp>
-#include <gev/logger.hpp>
-#include <gev/descriptors.hpp>
-#include <gev/imgui/imgui.h>
-#include <gev/audio/audio.hpp>
-
 #include <string>
-#include <functional>
-#include <vulkan/vulkan.hpp>
-#include <GLFW/glfw3.h>
-#include <any>
 #include <unordered_map>
 
 namespace gev
@@ -84,7 +86,8 @@ namespace gev
     vk::SurfaceKHR window_surface() const;
     vk::SurfaceFormat2KHR swapchain_format() const;
     vk::Format depth_format() const;
-    vk::Format select_format(vk::ArrayProxy<vk::Format const> candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) const;
+    vk::Format select_format(
+      vk::ArrayProxy<vk::Format const> candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) const;
     vk::SwapchainKHR swapchain() const;
     vk::Extent2D swapchain_size() const;
 
@@ -95,15 +98,15 @@ namespace gev
     frame const& current_frame() const;
 
     void execute_once(std::function<void(vk::CommandBuffer c)> func, vk::CommandPool pool, bool synchronize = false);
-    void execute_once(std::function<void(vk::CommandBuffer c)> func, vk::Queue queue, vk::CommandPool pool, bool synchronize = false);
+    void execute_once(
+      std::function<void(vk::CommandBuffer c)> func, vk::Queue queue, vk::CommandPool pool, bool synchronize = false);
 
   private:
     engine() = default;
     void start_impl(std::string const& title, int width, int height);
 
     VkBool32 debug_message_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-      VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-      const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+      VkDebugUtilsMessageTypeFlagsEXT messageTypes, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
       void* pUserData);
 
     vk::UniqueInstance create_instance(std::string const& title);
@@ -144,4 +147,4 @@ namespace gev
 
     ImGuiContext* _imgui_context = nullptr;
   };
-}
+}    // namespace gev

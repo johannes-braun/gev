@@ -8,7 +8,9 @@ namespace gev
     return descriptor_layout_creator{};
   }
 
-  descriptor_layout_creator& descriptor_layout_creator::bind(std::uint32_t binding, vk::DescriptorType type, std::uint32_t count, vk::ShaderStageFlags stage_flags, vk::DescriptorBindingFlags flags, vk::ArrayProxy<vk::Sampler> immutable_sampler)
+  descriptor_layout_creator& descriptor_layout_creator::bind(std::uint32_t binding, vk::DescriptorType type,
+    std::uint32_t count, vk::ShaderStageFlags stage_flags, vk::DescriptorBindingFlags flags,
+    vk::ArrayProxy<vk::Sampler> immutable_sampler)
   {
     std::uintptr_t offset = static_cast<std::uintptr_t>(_samplers.size());
     vk::Sampler const* offset_ptr = std::bit_cast<vk::Sampler const*>(offset);
@@ -16,8 +18,21 @@ namespace gev
     {
       _samplers.insert(_samplers.end(), immutable_sampler.begin(), immutable_sampler.end());
     }
-
     _bindings.push_back(vk::DescriptorSetLayoutBinding(binding, type, count, stage_flags, offset_ptr));
+    _flags.push_back(flags);
+    return *this;
+  }
+
+  descriptor_layout_creator& descriptor_layout_creator::bind(std::uint32_t binding, vk::DescriptorType type,
+    vk::ShaderStageFlags stage_flags, vk::DescriptorBindingFlags flags, vk::ArrayProxy<vk::Sampler> immutable_sampler)
+  {
+    std::uintptr_t offset = static_cast<std::uintptr_t>(_samplers.size());
+    vk::Sampler const* offset_ptr = std::bit_cast<vk::Sampler const*>(offset);
+    if (!immutable_sampler.empty())
+    {
+      _samplers.insert(_samplers.end(), immutable_sampler.begin(), immutable_sampler.end());
+    }
+    _bindings.push_back(vk::DescriptorSetLayoutBinding(binding, type, stage_flags, *offset_ptr));
     _flags.push_back(flags);
     return *this;
   }
@@ -30,7 +45,13 @@ namespace gev
       vk::DescriptorSetLayoutCreateInfo().setBindings(_bindings).setPNext(&flags_info));
   }
 
-  void update_descriptor(vk::DescriptorSet set, std::uint32_t binding, vk::DescriptorBufferInfo info, vk::DescriptorType type, std::uint32_t array_element)
+  void update_descriptor(vk::DescriptorSet set, std::uint32_t binding, gev::buffer const& buf, vk::DescriptorType type)
+  {
+    update_descriptor(set, binding, vk::DescriptorBufferInfo().setBuffer(buf.get_buffer()).setRange(buf.size()), type);
+  }
+
+  void update_descriptor(vk::DescriptorSet set, std::uint32_t binding, vk::DescriptorBufferInfo info,
+    vk::DescriptorType type, std::uint32_t array_element)
   {
     vk::WriteDescriptorSet write;
     write.setDescriptorCount(1)
@@ -42,7 +63,8 @@ namespace gev
     engine::get().device().updateDescriptorSets(write, {});
   }
 
-  void update_descriptor(vk::DescriptorSet set, std::uint32_t binding, vk::DescriptorImageInfo info, vk::DescriptorType type, std::uint32_t array_element)
+  void update_descriptor(vk::DescriptorSet set, std::uint32_t binding, vk::DescriptorImageInfo info,
+    vk::DescriptorType type, std::uint32_t array_element)
   {
     vk::WriteDescriptorSet write;
     write.setDescriptorCount(1)
@@ -54,14 +76,12 @@ namespace gev
     engine::get().device().updateDescriptorSets(write, {});
   }
 
-  descriptor_allocator::descriptor_allocator(int size)
-    : _pool_size(size)
+  descriptor_allocator::descriptor_allocator(int size) : _pool_size(size)
   {
     for (size_t i = 0; i < _scales.size(); ++i)
     {
-      _sizes.push_back(vk::DescriptorPoolSize()
-        .setType(_scales[i].type)
-        .setDescriptorCount(_scales[i].scale * _pool_size));
+      _sizes.push_back(
+        vk::DescriptorPoolSize().setType(_scales[i].type).setDescriptorCount(_scales[i].scale * _pool_size));
     }
   }
 
@@ -77,12 +97,14 @@ namespace gev
 
     std::vector<vk::DescriptorSet> result;
     bool needs_allocation = false;
-    vk::DescriptorSetAllocateInfo info = vk::DescriptorSetAllocateInfo()
-      .setDescriptorPool(_current_pool)
-      .setDescriptorSetCount(count)
-      .setSetLayouts(layout);
+    vk::DescriptorSetAllocateInfo info =
+      vk::DescriptorSetAllocateInfo()
+        .setDescriptorPool(_current_pool)
+        .setDescriptorSetCount(count)
+        .setSetLayouts(layout);
 
-    try {
+    try
+    {
       result = engine::get().device().allocateDescriptorSets(info);
     }
     catch (vk::FragmentedPoolError const& fragmented)
@@ -117,9 +139,7 @@ namespace gev
   void descriptor_allocator::allocate_next_pool()
   {
     vk::DescriptorPoolCreateInfo info;
-    info.setFlags(vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind)
-      .setMaxSets(_pool_size)
-      .setPoolSizes(_sizes);
+    info.setFlags(vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind).setMaxSets(_pool_size).setPoolSizes(_sizes);
     _pools.push_back(engine::get().device().createDescriptorPoolUnique(info));
   }
 
@@ -146,4 +166,4 @@ namespace gev
     _pools.clear();
     _current_pool = nullptr;
   }
-}
+}    // namespace gev

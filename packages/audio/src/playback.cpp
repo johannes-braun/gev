@@ -1,6 +1,7 @@
-#include <gev/audio/playback.hpp>
-#include <AL/al.h>
 #include "source_allocator.hpp"
+
+#include <AL/al.h>
+#include <gev/audio/playback.hpp>
 
 namespace gev::audio
 {
@@ -23,7 +24,7 @@ namespace gev::audio
     set_looping(false);
     set_volume(1.0f);
     set_pitch(1.0f);
-    set_position({ 0,0,0 });
+    set_position({0, 0, 0});
     alSourcei(get_raw(_source.get()), AL_BUFFER, 0);
   }
 
@@ -103,4 +104,4 @@ namespace gev::audio
     alGetSourcei(get_raw(_source.get()), AL_SOURCE_STATE, &state);
     return state == AL_PLAYING;
   }
-}
+}    // namespace gev::audio

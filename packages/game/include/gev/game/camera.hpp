@@ -1,9 +1,9 @@
 #pragma once
 
-#include <rnu/math/math.hpp>
-#include <gev/scenery/transform.hpp>
-#include <gev/per_frame.hpp>
 #include <gev/game/mesh_renderer.hpp>
+#include <gev/per_frame.hpp>
+#include <gev/scenery/transform.hpp>
+#include <rnu/math/math.hpp>
 
 namespace gev::game
 {
@@ -15,12 +15,11 @@ namespace gev::game
     void set_transform(rnu::mat4 transform);
     void set_view(rnu::mat4 view_matrix);
     void set_projection(rnu::mat4 projection);
-    rnu::mat4 view();
-    rnu::mat4 projection();
+    rnu::mat4 view() const;
+    rnu::mat4 projection() const;
 
-    void finalize(frame const& frame, mesh_renderer const& r);
-    void bind(frame const& frame, mesh_renderer const& r);
-    void bind(frame const& frame, vk::PipelineLayout layout);
+    vk::DescriptorSet descriptor(int frame_index);
+    void bind(vk::CommandBuffer c, int frame_index, vk::PipelineLayout layout, std::uint32_t binding);
 
   private:
     rnu::mat4 _view_matrix;
@@ -28,10 +27,16 @@ namespace gev::game
 
     struct per_frame_info
     {
+      struct matrices
+      {
+        rnu::mat4 view_matrix = {};
+        rnu::mat4 proj_matrix = {};
+      } mat;
+
       vk::DescriptorSet descriptor;
       std::unique_ptr<gev::buffer> uniform_buffer;
+      bool dirty = true;
     };
-    vk::DescriptorSetLayout _layout;
     gev::per_frame<per_frame_info> _per_frame;
   };
-}
+}    // namespace gev::game

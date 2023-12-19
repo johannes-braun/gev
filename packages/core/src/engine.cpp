@@ -1,22 +1,22 @@
-#define VMA_STATIC_VULKAN_FUNCTIONS 0
+#define VMA_STATIC_VULKAN_FUNCTIONS  0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
-#include <gev/engine.hpp>
+#include "rethink_sans.hpp"
 
-#include <gev/imgui/imgui.h>
-#include <gev/imgui/imgui_impl_vulkan.h>
-#include <gev/imgui/imgui_impl_glfw.h>
-
-#include <stdexcept>
-#include <print>
-#include <unordered_map>
-#include <unordered_set>
-#include <ranges> 
-#include <sstream>
-
+// clang-format off
 #include <vulkan/vulkan.hpp>
 #include <GLFW/glfw3.h>
+// clang-format on
 
-#include "rethink_sans.hpp"
+#include <gev/engine.hpp>
+#include <gev/imgui/imgui.h>
+#include <gev/imgui/imgui_impl_glfw.h>
+#include <gev/imgui/imgui_impl_vulkan.h>
+#include <print>
+#include <ranges>
+#include <sstream>
+#include <stdexcept>
+#include <unordered_map>
+#include <unordered_set>
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
@@ -26,14 +26,17 @@ namespace gev
   {
   public:
     queue_family() = default;
-    void set(int index) {
+    void set(int index)
+    {
       _index = index;
       _done = true;
     }
-    bool done() const {
+    bool done() const
+    {
       return _done;
     }
-    int family() const {
+    int family() const
+    {
       return _index;
     }
 
@@ -59,14 +62,19 @@ namespace gev
     return _logger;
   }
 
-  vk::Format find_supported_format(vk::PhysicalDevice device, vk::ArrayProxy<vk::Format const> candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) {
-    for (auto const format : candidates) {
+  vk::Format find_supported_format(vk::PhysicalDevice device, vk::ArrayProxy<vk::Format const> candidates,
+    vk::ImageTiling tiling, vk::FormatFeatureFlags features)
+  {
+    for (auto const format : candidates)
+    {
       auto const props = device.getFormatProperties(format);
 
-      if (tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features) {
+      if (tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features)
+      {
         return format;
       }
-      else if (tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features) {
+      else if (tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features)
+      {
         return format;
       }
     }
@@ -81,16 +89,17 @@ namespace gev
 
   void engine::start_impl(std::string const& title, int width, int height)
   {
-    static class glfw_initializer {
+    static class glfw_initializer
+    {
     public:
-      glfw_initializer() : _started(glfwInit()) {
-
-      }
-      ~glfw_initializer() {
+      glfw_initializer() : _started(glfwInit()) {}
+      ~glfw_initializer()
+      {
         glfwTerminate();
       }
 
-      bool has_started() const noexcept {
+      bool has_started() const noexcept
+      {
         return _started;
       }
 
@@ -108,24 +117,24 @@ namespace gev
     _instance = create_instance(title);
     VULKAN_HPP_DEFAULT_DISPATCHER.init(*_instance);
 
-    _debug_messenger = _instance->createDebugUtilsMessengerEXTUnique(vk::DebugUtilsMessengerCreateInfoEXT()
-      .setMessageSeverity(
-        //vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
-        //vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
-        vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-        vk::DebugUtilsMessageSeverityFlagBitsEXT::eError
-      ).setMessageType(
-        vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-        vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
-        vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding |
-        vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance
-      ).setPfnUserCallback([](VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-        VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-        void* pUserData) -> VkBool32 {
-          auto* e = static_cast<engine*>(pUserData);
-          return e->debug_message_callback(messageSeverity, messageTypes, pCallbackData, pUserData);
-        }).setPUserData(this));
+    _debug_messenger = _instance->createDebugUtilsMessengerEXTUnique(
+      vk::DebugUtilsMessengerCreateInfoEXT()
+        .setMessageSeverity(
+          // vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
+          // vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
+          vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError)
+        .setMessageType(vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+          vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
+          vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding |
+          vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance)
+        .setPfnUserCallback(
+          [](VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+            const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) -> VkBool32
+          {
+            auto* e = static_cast<engine*>(pUserData);
+            return e->debug_message_callback(messageSeverity, messageTypes, pCallbackData, pUserData);
+          })
+        .setPUserData(this));
 
     _physical_device = pick_physical_device();
     _physical_device_properties = _physical_device.getProperties();
@@ -146,17 +155,17 @@ namespace gev
     create_swapchain();
 
     auto const imgui_pool_size = vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1);
-    _imgui_descriptor_pool = _device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo()
-      .setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
-      .setMaxSets(1)
-      .setPoolSizes(imgui_pool_size));
+    _imgui_descriptor_pool = _device->createDescriptorPoolUnique(
+      vk::DescriptorPoolCreateInfo()
+        .setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
+        .setMaxSets(1)
+        .setPoolSizes(imgui_pool_size));
     _imgui_context = ImGui::CreateContext();
     ImGui::SetCurrentContext(_imgui_context);
-    ImGui::StyleColorsLight();
+    ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForVulkan(_window.get(), true);
-    ImGui_ImplVulkan_LoadFunctions([](const char* function_name, void* vulkan_instance) {
-      return gev::engine::get().instance().getProcAddr(function_name);
-      });
+    ImGui_ImplVulkan_LoadFunctions([](const char* function_name, void* vulkan_instance)
+      { return gev::engine::get().instance().getProcAddr(function_name); });
     ImGui_ImplVulkan_InitInfo init{};
     init.UseDynamicRendering = true;
     init.ColorAttachmentFormat = VkFormat(gev::engine::get().swapchain_format().surfaceFormat.format);
@@ -175,34 +184,24 @@ namespace gev
     cfg.FontDataOwnedByAtlas = false;
     ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<std::uint8_t*>(rethink_sans), rethink_sans_length, 16, &cfg);
 
-    _depth_format = select_format({ vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint, vk::Format::eD16UnormS8Uint },
-      vk::ImageTiling::eOptimal,
-      vk::FormatFeatureFlagBits::eDepthStencilAttachment);
+    _depth_format =
+      select_format({vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint, vk::Format::eD16UnormS8Uint},
+        vk::ImageTiling::eOptimal, vk::FormatFeatureFlagBits::eDepthStencilAttachment);
 
     _audio_host = audio::audio_host::create();
   }
 
   VkBool32 engine::debug_message_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-    VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    VkDebugUtilsMessageTypeFlagsEXT messageTypes, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
     void* pUserData)
   {
     switch (messageSeverity)
     {
-    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-      _logger.debug("{}", pCallbackData->pMessage);
-      break;
-    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-      _logger.log("{}", pCallbackData->pMessage);
-      break;
-    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-      _logger.warn("{}", pCallbackData->pMessage);
-      break;
-    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-      _logger.error("{}", pCallbackData->pMessage);
-      break;
-    default:
-      break;
+      case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT: _logger.debug("{}", pCallbackData->pMessage); break;
+      case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT: _logger.log("{}", pCallbackData->pMessage); break;
+      case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: _logger.warn("{}", pCallbackData->pMessage); break;
+      case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: _logger.error("{}", pCallbackData->pMessage); break;
+      default: break;
     }
     return VK_FALSE;
   }
@@ -235,8 +234,8 @@ namespace gev
       }
       auto& frame = _per_swapchain_image[current_frame];
 
-      [[maybe_unused]] auto const wait_result = _device->
-        waitForFences(frame.render_fence.get(), true, std::numeric_limits<std::uint64_t>::max());
+      [[maybe_unused]] auto const wait_result =
+        _device->waitForFences(frame.render_fence.get(), true, std::numeric_limits<std::uint64_t>::max());
       _device->resetFences(frame.render_fence.get());
 
       vk::AcquireNextImageInfoKHR acquire;
@@ -267,29 +266,23 @@ namespace gev
 
       ImGui::Render();
 
-      frame.output_image->layout(c,
-        vk::ImageLayout::eColorAttachmentOptimal,
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::AccessFlagBits2::eColorAttachmentWrite,
+      frame.output_image->layout(c, vk::ImageLayout::eColorAttachmentOptimal,
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2::eColorAttachmentWrite,
         _queues.graphics_family);
-      auto out_att = vk::RenderingAttachmentInfo()
-        .setImageLayout(vk::ImageLayout::eColorAttachmentOptimal)
-        .setImageView(frame.output_view.get())
-        .setLoadOp(vk::AttachmentLoadOp::eLoad)
-        .setStoreOp(vk::AttachmentStoreOp::eStore);
-      c.beginRendering(vk::RenderingInfo()
-        .setColorAttachments(out_att)
-        .setLayerCount(1)
-        .setRenderArea(vk::Rect2D({ 0, 0 }, { _swapchain_size.width, _swapchain_size.height })));
+      auto out_att =
+        vk::RenderingAttachmentInfo()
+          .setImageLayout(vk::ImageLayout::eColorAttachmentOptimal)
+          .setImageView(frame.output_view.get())
+          .setLoadOp(vk::AttachmentLoadOp::eLoad)
+          .setStoreOp(vk::AttachmentStoreOp::eStore);
+      c.beginRendering(vk::RenderingInfo().setColorAttachments(out_att).setLayerCount(1).setRenderArea(
+        vk::Rect2D({0, 0}, {_swapchain_size.width, _swapchain_size.height})));
 
       ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), c);
       c.endRendering();
 
-      frame.output_image->layout(c,
-        vk::ImageLayout::ePresentSrcKHR,
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::AccessFlagBits2::eColorAttachmentRead,
-        _queues.present_family);
+      frame.output_image->layout(c, vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::AccessFlagBits2::eColorAttachmentRead, _queues.present_family);
       c.end();
 
       vk::SubmitInfo submit;
@@ -309,8 +302,7 @@ namespace gev
       glfwPollEvents();
       current_frame = (current_frame + 1) % _per_swapchain_image.size();
 
-      if (present_result == vk::Result::eErrorOutOfDateKHR ||
-        present_result == vk::Result::eSuboptimalKHR)
+      if (present_result == vk::Result::eErrorOutOfDateKHR || present_result == vk::Result::eSuboptimalKHR)
       {
         create_swapchain();
         continue;
@@ -330,7 +322,8 @@ namespace gev
     ImGui::DestroyContext(_imgui_context);
   }
 
-  vk::Format engine::select_format(vk::ArrayProxy<vk::Format const> candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) const
+  vk::Format engine::select_format(
+    vk::ArrayProxy<vk::Format const> candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) const
   {
     return find_supported_format(_physical_device, candidates, tiling, features);
   }
@@ -350,7 +343,8 @@ namespace gev
     _resize_callbacks.push_back(std::move(callback));
   }
 
-  void engine::execute_once(std::function<void(vk::CommandBuffer c)> func, vk::Queue queue, vk::CommandPool pool, bool synchronize)
+  void engine::execute_once(
+    std::function<void(vk::CommandBuffer c)> func, vk::Queue queue, vk::CommandPool pool, bool synchronize)
   {
     vk::CommandBufferAllocateInfo cballoc;
     cballoc.commandBufferCount = 1;
@@ -374,8 +368,8 @@ namespace gev
 
     if (fence)
     {
-      [[maybe_unused]] auto const r = gev::engine::get().device().waitForFences(
-        fence.get(), true, std::numeric_limits<std::uint64_t>::max());
+      [[maybe_unused]] auto const r =
+        gev::engine::get().device().waitForFences(fence.get(), true, std::numeric_limits<std::uint64_t>::max());
     }
   }
 
@@ -391,12 +385,7 @@ namespace gev
       throw std::runtime_error("Instance version is not high enough.");
 
     vk::ApplicationInfo app_info(
-      title.c_str(),
-      VK_MAKE_API_VERSION(1, 0, 0, 0),
-      "GEV",
-      VK_MAKE_API_VERSION(1, 0, 0, 0),
-      VK_API_VERSION_1_3
-    );
+      title.c_str(), VK_MAKE_API_VERSION(1, 0, 0, 0), "GEV", VK_MAKE_API_VERSION(1, 0, 0, 0), VK_API_VERSION_1_3);
 
     vk::InstanceCreateInfo instance_info;
     instance_info.pApplicationInfo = &app_info;
@@ -406,9 +395,7 @@ namespace gev
     };
 
     std::vector required_instance_extensions{
-      VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-      VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME
-    };
+      VK_EXT_DEBUG_UTILS_EXTENSION_NAME, VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME};
     std::uint32_t num_glfw = 0;
     auto const** arr_glfw = glfwGetRequiredInstanceExtensions(&num_glfw);
     for (std::uint32_t i = 0; i < num_glfw; ++i)
@@ -490,22 +477,24 @@ namespace gev
     clock.shaderDeviceClock = true;
     rend.pNext = &clock;
     vk::PhysicalDeviceVulkan11Features vk11f;
-    vk11f
-      .setShaderDrawParameters(true);
+    vk11f.setShaderDrawParameters(true);
     clock.pNext = &vk11f;
     vk::PhysicalDeviceVertexInputDynamicStateFeaturesEXT dynamic_vertex_input;
     dynamic_vertex_input.setVertexInputDynamicState(true);
     vk11f.pNext = &dynamic_vertex_input;
 
-    vk::PhysicalDeviceDescriptorIndexingFeatures descriptor_properties;
-    descriptor_properties.setDescriptorBindingPartiallyBound(true);
-    dynamic_vertex_input.pNext = &descriptor_properties;
+    vk::PhysicalDeviceVulkan12Features ft12;
+    ft12.setRuntimeDescriptorArray(true);
+    ft12.setDescriptorBindingPartiallyBound(true);
+    ft12.setDescriptorBindingVariableDescriptorCount(true);
+    dynamic_vertex_input.pNext = &ft12;
 
-    const std::array required_device_extensions = {
-      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-      VK_KHR_SHADER_CLOCK_EXTENSION_NAME,
-      VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME
-    };
+    vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT extd3;
+    extd3.setExtendedDynamicState3RasterizationSamples(true);
+    ft12.pNext = &extd3;
+
+    const std::array required_device_extensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_SHADER_CLOCK_EXTENSION_NAME,
+      VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME, VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME};
 
     std::vector<const char*> found_device_extensions;
     for (auto const& req : required_device_extensions)
@@ -526,7 +515,6 @@ namespace gev
 
       _logger.warn("Device Extension {}: NOT FOUND", req);
     }
-
 
     // 1present, 2 gfx, 2 transfer, 2 compute
     queue_family present_family;
@@ -574,7 +562,7 @@ namespace gev
 
     std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
     std::unordered_map<std::uint32_t, std::uint32_t> indices;
-    std::array priorities{ 1.0f };
+    std::array priorities{1.0f};
 
     for (auto const& family : family_filter)
     {
@@ -622,11 +610,12 @@ namespace gev
   void engine::open_window(std::string const& title, int w, int h)
   {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    _window = unique_window{ glfwCreateWindow(w, h, title.data(), nullptr, nullptr) };
+    _window = unique_window{glfwCreateWindow(w, h, title.data(), nullptr, nullptr)};
 
     VkSurfaceKHR surface = nullptr;
     glfwCreateWindowSurface(*_instance, _window.get(), nullptr, &surface);
-    _window_surface = vk::UniqueSurfaceKHR(surface, vk::ObjectDestroy<vk::Instance, VULKAN_HPP_DEFAULT_DISPATCHER_TYPE>(_instance.get()));
+    _window_surface = vk::UniqueSurfaceKHR(
+      surface, vk::ObjectDestroy<vk::Instance, VULKAN_HPP_DEFAULT_DISPATCHER_TYPE>(_instance.get()));
 
     vk::PhysicalDeviceSurfaceInfo2KHR query(*_window_surface);
     auto const formats = _physical_device.getSurfaceFormats2KHR(query);
@@ -659,10 +648,8 @@ namespace gev
 
     vk::SwapchainCreateInfoKHR sc_info;
     sc_info.surface = *_window_surface;
-    sc_info.minImageCount = std::clamp(requested_num_swapchain_images,
-      caps.surfaceCapabilities.minImageCount,
-      caps.surfaceCapabilities.maxImageCount
-    );
+    sc_info.minImageCount = std::clamp(
+      requested_num_swapchain_images, caps.surfaceCapabilities.minImageCount, caps.surfaceCapabilities.maxImageCount);
     sc_info.imageArrayLayers = 1;
     sc_info.imageUsage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eColorAttachment;
     sc_info.imageSharingMode = vk::SharingMode::eExclusive;
@@ -672,10 +659,7 @@ namespace gev
     sc_info.imageColorSpace = _swapchain_format.surfaceFormat.colorSpace;
     sc_info.imageFormat = _swapchain_format.surfaceFormat.format;
 
-    std::unordered_set<std::uint32_t> unique_families{
-      _queues.graphics_family,
-      _queues.present_family
-    };
+    std::unordered_set<std::uint32_t> unique_families{_queues.graphics_family, _queues.present_family};
     std::vector<std::uint32_t> families(std::begin(unique_families), end(unique_families));
     sc_info.setQueueFamilyIndices(families);
     sc_info.preTransform = caps.surfaceCapabilities.currentTransform;
@@ -703,33 +687,28 @@ namespace gev
     cbufs[0]->begin(begin);
 
     std::unordered_set<std::uint32_t> const queue_families_set{
-      _queues.graphics_family,
-        _queues.present_family,
-        _queues.transfer_family
-    };
+      _queues.graphics_family, _queues.present_family, _queues.transfer_family};
     std::vector<std::uint32_t> const queue_families(std::begin(queue_families_set), end(queue_families_set));
 
     for (std::size_t i = 0; i < _per_swapchain_image.size(); ++i)
     {
       auto& pi = _per_swapchain_image[i];
-      pi.output_image = std::make_shared<image>(images[i],
-        _swapchain_format.surfaceFormat.format,
-        vk::Extent3D(_swapchain_size));
-      pi.output_view = _device->createImageViewUnique(vk::ImageViewCreateInfo()
-        .setComponents(vk::ComponentMapping())
+      pi.output_image =
+        std::make_shared<image>(images[i], _swapchain_format.surfaceFormat.format, vk::Extent3D(_swapchain_size, 1));
+      pi.output_view = _device->createImageViewUnique(
+        vk::ImageViewCreateInfo()
+          .setComponents(vk::ComponentMapping())
 
-        .setFormat(sc_info.imageFormat)
-        .setImage(pi.output_image->get_image())
-        .setSubresourceRange(vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1))
-        .setViewType(vk::ImageViewType::e2D));
+          .setFormat(sc_info.imageFormat)
+          .setImage(pi.output_image->get_image())
+          .setSubresourceRange(vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1))
+          .setViewType(vk::ImageViewType::e2D));
       pi.available_semaphore = _device->createSemaphoreUnique(vk::SemaphoreCreateInfo());
       pi.finished_semaphore = _device->createSemaphoreUnique(vk::SemaphoreCreateInfo());
       pi.render_fence = _device->createFenceUnique(vk::FenceCreateInfo().setFlags(vk::FenceCreateFlagBits::eSignaled));
 
-      pi.output_image->layout(cbufs[0].get(),
-        vk::ImageLayout::ePresentSrcKHR,
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::AccessFlagBits2::eColorAttachmentRead,
+      pi.output_image->layout(cbufs[0].get(), vk::ImageLayout::ePresentSrcKHR,
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2::eColorAttachmentRead,
         _queues.present_family);
     }
     cbufs[0]->end();
@@ -739,7 +718,8 @@ namespace gev
     cbs.commandBuffer = cbufs[0].get();
     submit.setCommandBufferInfos(cbs);
     _queues.graphics.submit2(submit, fence.get());
-    [[maybe_unused]] auto const wait_result = _device->waitForFences(fence.get(), true, std::numeric_limits<uint32_t>::max());
+    [[maybe_unused]] auto const wait_result =
+      _device->waitForFences(fence.get(), true, std::numeric_limits<uint32_t>::max());
 
     for (auto& callback : _resize_callbacks)
       callback(_swapchain_size.width, _swapchain_size.height);
@@ -775,32 +755,39 @@ namespace gev
     return *_device;
   }
 
-  shared_allocator const& engine::allocator() const {
+  shared_allocator const& engine::allocator() const
+  {
     return _allocator;
   }
 
-  queues const& engine::queues() const {
+  queues const& engine::queues() const
+  {
     return _queues;
   }
 
-  GLFWwindow* engine::window() const {
+  GLFWwindow* engine::window() const
+  {
     return _window.get();
   }
 
-  vk::SurfaceKHR engine::window_surface() const {
+  vk::SurfaceKHR engine::window_surface() const
+  {
     return _window_surface.get();
   }
 
-  vk::SurfaceFormat2KHR engine::swapchain_format() const {
+  vk::SurfaceFormat2KHR engine::swapchain_format() const
+  {
     return _swapchain_format;
   }
 
-  vk::SwapchainKHR engine::swapchain() const {
+  vk::SwapchainKHR engine::swapchain() const
+  {
     return _swapchain.get();
   }
 
-  vk::Extent2D engine::swapchain_size() const {
+  vk::Extent2D engine::swapchain_size() const
+  {
     return _swapchain_size;
   }
 
-}
+}    // namespace gev

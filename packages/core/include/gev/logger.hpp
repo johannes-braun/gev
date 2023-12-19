@@ -1,10 +1,10 @@
 #pragma once
 
-#include <thread>
-#include <rnu/thread_pool.hpp>
 #include <format>
+#include <rnu/thread_pool.hpp>
+#include <thread>
 
-namespace gev 
+namespace gev
 {
   enum class severity
   {
@@ -55,4 +55,4 @@ namespace gev
 
     rnu::thread_pool _pool;
   };
-}
+}    // namespace gev

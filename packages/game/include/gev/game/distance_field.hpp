@@ -1,7 +1,7 @@
 #pragma once
 
-#include <memory>
 #include <gev/image.hpp>
+#include <memory>
 #include <rnu/math/math.hpp>
 
 namespace gev::game
@@ -22,4 +22,4 @@ namespace gev::game
     vk::UniqueImageView _image_view;
     vk::UniqueSampler _sampler;
   };
-}
+}    // namespace gev::game

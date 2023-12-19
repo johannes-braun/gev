@@ -52,4 +52,4 @@ namespace gev
     std::function<T(int index)> _generator;
     std::vector<std::pair<T, bool>> _per_frame;
   };
-}
+}    // namespace gev

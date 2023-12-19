@@ -3,6 +3,26 @@
 
 namespace gev
 {
+  std::unique_ptr<buffer> buffer::device_local(std::size_t size, vk::BufferUsageFlags usage)
+  {
+    return std::make_unique<buffer>(VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, 0,
+      vk::BufferCreateInfo().setSharingMode(vk::SharingMode::eExclusive).setSize(size).setUsage(usage));
+  }
+
+  std::unique_ptr<buffer> buffer::host_accessible(std::size_t size, vk::BufferUsageFlags usage)
+  {
+    return std::make_unique<buffer>(VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+      vk::BufferCreateInfo().setSharingMode(vk::SharingMode::eExclusive).setSize(size).setUsage(usage));
+  }
+
+  std::unique_ptr<buffer> buffer::host_local(std::size_t size, vk::BufferUsageFlags usage)
+  {
+    return std::make_unique<buffer>(VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
+      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+      vk::BufferCreateInfo().setSharingMode(vk::SharingMode::eExclusive).setSize(size).setUsage(usage));
+  }
+
   buffer::buffer(VmaMemoryUsage usage, VmaAllocationCreateFlags flags, vk::BufferCreateInfo const& create)
   {
     VkBufferCreateInfo const& info = create;
@@ -18,11 +38,13 @@ namespace gev
     VmaAllocationInfo alloc_result_info;
     auto const result = vmaCreateBuffer(allocator.get(), &info, &alloc_info, &buf, &alloc, &alloc_result_info);
     _allocation = wrap_allocation(allocator, alloc);
-    _buffer = vk::UniqueBuffer(buf, vk::ObjectDestroy<vk::Device, VULKAN_HPP_DEFAULT_DISPATCHER_TYPE>(engine::get().device()));
+    _buffer =
+      vk::UniqueBuffer(buf, vk::ObjectDestroy<vk::Device, VULKAN_HPP_DEFAULT_DISPATCHER_TYPE>(engine::get().device()));
 
     auto const mem_properties = engine::get().physical_device().getMemoryProperties();
     auto const memory_flags = mem_properties.memoryTypes[alloc_result_info.memoryType].propertyFlags;
-    _host_visible = (memory_flags & vk::MemoryPropertyFlagBits::eHostVisible) == vk::MemoryPropertyFlagBits::eHostVisible;
+    _host_visible =
+      (memory_flags & vk::MemoryPropertyFlagBits::eHostVisible) == vk::MemoryPropertyFlagBits::eHostVisible;
   }
 
   void buffer::load_data(void const* data, std::uint32_t size, std::uint32_t offset)
@@ -37,24 +59,19 @@ namespace gev
 
       void* memory = nullptr;
       vmaMapMemory(allocator.get(), _allocation.get(), &memory);
-      std::memcpy(memory, data, size);
+      std::byte* dst = static_cast<std::byte*>(memory) + offset;
+      std::memcpy(dst, data, size);
       vmaFlushAllocation(allocator.get(), _allocation.get(), offset, size);
       vmaUnmapMemory(allocator.get(), _allocation.get());
     }
     else
     {
       auto const pool = engine::get().queues().transfer_command_pool.get();
-      buffer staging_buffer(VMA_MEMORY_USAGE_AUTO_PREFER_HOST, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
-        vk::BufferCreateInfo()
-        .setQueueFamilyIndices(engine::get().queues().transfer_family)
-        .setSharingMode(vk::SharingMode::eExclusive)
-        .setSize(size)
-        .setUsage(vk::BufferUsageFlagBits::eTransferSrc));
-      staging_buffer.load_data(data, size);
 
-      engine::get().execute_once([&](auto c) {
-        staging_buffer.copy_to(c, *this, size, 0, offset);
-        }, pool, true);
+      auto const staging_buffer = host_local(size, vk::BufferUsageFlagBits::eTransferSrc);
+      staging_buffer->load_data(data, size);
+
+      engine::get().execute_once([&](auto c) { staging_buffer->copy_to(c, *this, size, 0, offset); }, pool, true);
     }
   }
 
@@ -82,7 +99,7 @@ namespace gev
     region.bufferOffset = 0;
     region.bufferRowLength = w;
     region.imageExtent = vk::Extent3D(w, h, d);
-    region.imageOffset = vk::Offset3D{ 0, 0, 0 };
+    region.imageOffset = vk::Offset3D{0, 0, 0};
     region.imageSubresource = vk::ImageSubresourceLayers(aspect, mip_layer, 0, other.array_layers());
     c.copyBufferToImage(_buffer.get(), other.get_image(), vk::ImageLayout::eTransferDstOptimal, region);
 
@@ -100,32 +117,33 @@ namespace gev
     }
   }
 
-  void buffer::copy_to(vk::CommandBuffer c, buffer const& other,
-    std::uint32_t size, std::uint32_t src_offset, std::uint32_t dst_offset)
+  void buffer::copy_to(
+    vk::CommandBuffer c, buffer const& other, std::uint32_t size, std::uint32_t src_offset, std::uint32_t dst_offset)
   {
     auto const& allocator = engine::get().allocator();
     VmaAllocationInfo ai{};
     vmaGetAllocationInfo(allocator.get(), _allocation.get(), &ai);
     size = size != VK_WHOLE_SIZE ? size : (ai.size - src_offset);
 
-    auto barr = vk::BufferMemoryBarrier()
-      .setBuffer(_buffer.get())
-      .setOffset(src_offset)
-      .setSize(size)
-      .setSrcAccessMask({})
-      .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-      .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
-      .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-    auto barr2 = vk::BufferMemoryBarrier(barr)
-      .setBuffer(other.get_buffer())
-      .setOffset(dst_offset)
-      .setSize(size)
-      .setDstAccessMask(vk::AccessFlagBits::eTransferWrite);
+    auto barr =
+      vk::BufferMemoryBarrier()
+        .setBuffer(_buffer.get())
+        .setOffset(src_offset)
+        .setSize(size)
+        .setSrcAccessMask({})
+        .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+        .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
+        .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+    auto barr2 =
+      vk::BufferMemoryBarrier(barr)
+        .setBuffer(other.get_buffer())
+        .setOffset(dst_offset)
+        .setSize(size)
+        .setDstAccessMask(vk::AccessFlagBits::eTransferWrite);
 
     c.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eTransfer,
-      vk::DependencyFlagBits::eByRegion, nullptr, { barr, barr2 }, nullptr);
-    c.copyBuffer(_buffer.get(), other.get_buffer(),
-      vk::BufferCopy(0, 0, size));
+      vk::DependencyFlagBits::eByRegion, nullptr, {barr, barr2}, nullptr);
+    c.copyBuffer(_buffer.get(), other.get_buffer(), vk::BufferCopy(src_offset, dst_offset, size));
 
     barr.setSrcAccessMask(vk::AccessFlagBits::eTransferRead)
       .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
@@ -136,7 +154,7 @@ namespace gev
       .setDstAccessMask(vk::AccessFlagBits::eVertexAttributeRead)
       .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
     c.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eAllCommands,
-      vk::DependencyFlagBits::eByRegion, nullptr, { barr, barr2 }, nullptr);
+      vk::DependencyFlagBits::eByRegion, nullptr, {barr, barr2}, nullptr);
   }
 
   vk::Buffer buffer::get_buffer() const
@@ -148,4 +166,4 @@ namespace gev
   {
     return _size;
   }
-}
+}    // namespace gev

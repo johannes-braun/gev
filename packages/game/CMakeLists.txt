@@ -12,10 +12,17 @@ target_sources(${GEV_CURRENT_LIBRARY} PRIVATE
   "src/texture.cpp"
   "src/camera.cpp"
   "src/material.cpp"
-  "src/distance_field_generator.cpp" "src/distance_field.cpp")
+  "src/distance_field_generator.cpp"
+  "src/distance_field.cpp"
+  "src/layouts.cpp"
+  "src/distance_field_holder.cpp"
+  "src/mesh_batch.cpp"
+  "src/shadow_map_holder.cpp" "src/shader.cpp")
 
 compile_shaders(gev_game_shaders
   "shaders/generate_distance_field.comp"
+  "shaders/depth_only.frag"
   "shaders/shader2.frag"
-  "shaders/shader2.vert")
+  "shaders/shader2.vert"
+  "shaders/shader2_rig.vert")
 target_link_libraries(gev.game PUBLIC gev_game_shaders)

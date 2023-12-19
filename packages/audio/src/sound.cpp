@@ -1,8 +1,8 @@
-#include <gev/audio/sound.hpp>
-#include <gev/audio/playback.hpp>
 #include <AL/al.h>
-#include <sndfile.h>
 #include <array>
+#include <gev/audio/playback.hpp>
+#include <gev/audio/sound.hpp>
+#include <sndfile.h>
 
 namespace gev::audio
 {
@@ -32,7 +32,8 @@ namespace gev::audio
     sf_close(static_cast<SNDFILE*>(_handle));
   }
 
-  std::shared_ptr<playback> sound::open_playback() {
+  std::shared_ptr<playback> sound::open_playback()
+  {
     return std::shared_ptr<playback>(new playback(_allocator, shared_from_this()));
   }
-}
+}    // namespace gev::audio

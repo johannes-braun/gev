@@ -1,9 +1,9 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
 #include <gev/audio/audio.hpp>
 #include <gev/audio/sound.hpp>
+#include <memory>
 #include <rnu/math/math.hpp>
 
 namespace gev::audio
@@ -42,4 +42,4 @@ namespace gev::audio
     std::shared_ptr<audio_source_handle> _source;
     std::shared_ptr<audio_buffer_handle> _buffer;
   };
-}
+}    // namespace gev::audio

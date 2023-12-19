@@ -1,9 +1,10 @@
 #pragma once
 
-#include <gev/audio/audio.hpp>
+#include "source_allocator.hpp"
+
 #include <AL/al.h>
 #include <AL/alc.h>
-#include "source_allocator.hpp"
+#include <gev/audio/audio.hpp>
 
 namespace gev::audio
 {
@@ -20,4 +21,4 @@ namespace gev::audio
     ALCcontext* _context = nullptr;
     std::shared_ptr<source_allocator> _source_allocator;
   };
-}
+}    // namespace gev::audio

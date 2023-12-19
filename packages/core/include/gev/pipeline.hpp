@@ -1,7 +1,7 @@
 #pragma once
 
-#include <vulkan/vulkan.hpp>
 #include <filesystem>
+#include <vulkan/vulkan.hpp>
 
 namespace gev
 {
@@ -11,7 +11,8 @@ namespace gev
   vk::UniquePipelineLayout create_pipeline_layout(vk::ArrayProxy<vk::DescriptorSetLayout const> descriptors = {},
     vk::ArrayProxy<vk::PushConstantRange> push_constant_ranges = {});
 
-  vk::UniquePipeline build_compute_pipeline(vk::PipelineLayout layout, vk::ShaderModule module, char const* entry = "main");
+  vk::UniquePipeline build_compute_pipeline(
+    vk::PipelineLayout layout, vk::ShaderModule module, char const* entry = "main");
 
   class simple_pipeline_builder
   {
@@ -21,19 +22,26 @@ namespace gev
 
     simple_pipeline_builder& dynamic_states(vk::ArrayProxy<vk::DynamicState> states);
 
-    simple_pipeline_builder& stage(vk::ShaderStageFlagBits stage_flags, vk::UniqueShaderModule const& module, vk::SpecializationInfo const& info, std::string name = "main");
-    simple_pipeline_builder& stage(vk::ShaderStageFlagBits stage_flags, vk::ShaderModule module, vk::SpecializationInfo const& info, std::string name = "main");
-    simple_pipeline_builder& stage(vk::ShaderStageFlagBits stage_flags, vk::UniqueShaderModule const& module, std::string name = "main");
-    simple_pipeline_builder& stage(vk::ShaderStageFlagBits stage_flags, vk::ShaderModule module, std::string name = "main");
+    simple_pipeline_builder& stage(vk::ShaderStageFlagBits stage_flags, vk::UniqueShaderModule const& module,
+      vk::SpecializationInfo const& info, std::string name = "main");
+    simple_pipeline_builder& stage(vk::ShaderStageFlagBits stage_flags, vk::ShaderModule module,
+      vk::SpecializationInfo const& info, std::string name = "main");
+    simple_pipeline_builder& stage(
+      vk::ShaderStageFlagBits stage_flags, vk::UniqueShaderModule const& module, std::string name = "main");
+    simple_pipeline_builder& stage(
+      vk::ShaderStageFlagBits stage_flags, vk::ShaderModule module, std::string name = "main");
 
     simple_pipeline_builder& topology(vk::PrimitiveTopology top);
-    simple_pipeline_builder& attribute(std::uint32_t location, std::uint32_t binding, vk::Format format, std::uint32_t offset = 0);
-    simple_pipeline_builder& binding(std::uint32_t binding, std::uint32_t stride, vk::VertexInputRate rate = vk::VertexInputRate::eVertex);
+    simple_pipeline_builder& attribute(
+      std::uint32_t location, std::uint32_t binding, vk::Format format, std::uint32_t offset = 0);
+    simple_pipeline_builder& binding(
+      std::uint32_t binding, std::uint32_t stride, vk::VertexInputRate rate = vk::VertexInputRate::eVertex);
 
     simple_pipeline_builder& multisampling(vk::SampleCountFlagBits samples);
     simple_pipeline_builder& color_attachment(vk::Format format);
     simple_pipeline_builder& depth_attachment(vk::Format format);
     simple_pipeline_builder& stencil_attachment(vk::Format format);
+    simple_pipeline_builder& raster_discard(bool discard);
 
     void clear();
     vk::UniquePipeline build();
@@ -41,7 +49,7 @@ namespace gev
   private:
     simple_pipeline_builder() = default;
 
-    std::vector<vk::DynamicState> _dynamic_states = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
+    std::vector<vk::DynamicState> _dynamic_states = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
     std::vector<std::string> _stage_names;
     std::vector<vk::SpecializationInfo> _stage_specializations;
     vk::PipelineLayout _layout;
@@ -53,5 +61,6 @@ namespace gev
     vk::Format _stencil_format = vk::Format::eUndefined;
     vk::SampleCountFlagBits _samples = vk::SampleCountFlagBits::e1;
     vk::PrimitiveTopology _topology = vk::PrimitiveTopology::eTriangleList;
+    bool _raster_discard = false;
   };
-}
+}    // namespace gev

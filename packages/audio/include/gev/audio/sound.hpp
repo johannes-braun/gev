@@ -1,7 +1,7 @@
 #pragma once
 
-#include <memory>
 #include <filesystem>
+#include <memory>
 
 namespace gev::audio
 {
@@ -32,4 +32,4 @@ namespace gev::audio
     int _sections;
     int _seekable;
   };
-}
+}    // namespace gev::audio

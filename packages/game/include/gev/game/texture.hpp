@@ -8,13 +8,10 @@ namespace gev::game
   class texture
   {
   public:
+    texture(std::span<std::uint8_t const> data, std::uint32_t width, std::uint32_t height);
     texture(std::filesystem::path const& image);
-    texture(std::filesystem::path const& posx,
-      std::filesystem::path const& negx,
-      std::filesystem::path const& posy,
-      std::filesystem::path const& negy,
-      std::filesystem::path const& posz,
-      std::filesystem::path const& negz);
+    texture(std::filesystem::path const& posx, std::filesystem::path const& negx, std::filesystem::path const& posy,
+      std::filesystem::path const& negy, std::filesystem::path const& posz, std::filesystem::path const& negz);
 
     gev::image const& image() const;
     vk::ImageView view() const;
@@ -28,4 +25,4 @@ namespace gev::game
     vk::UniqueImageView _texture_view;
     vk::UniqueSampler _sampler;
   };
-}
+}    // namespace gev::game

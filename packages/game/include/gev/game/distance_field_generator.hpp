@@ -1,9 +1,9 @@
 #pragma once
 
 #include <gev/engine.hpp>
-#include <rnu/math/math.hpp>
 #include <gev/game/distance_field.hpp>
 #include <gev/game/mesh.hpp>
+#include <rnu/math/math.hpp>
 
 namespace gev::game
 {
@@ -32,4 +32,4 @@ namespace gev::game
     vk::DescriptorSet _descriptor;
     std::unique_ptr<gev::buffer> _options_buffer;
   };
-}
+}    // namespace gev::game

@@ -1,11 +1,11 @@
-#include <gev/audio/audio.hpp>
 #include "audio_host.hpp"
 
 #include <AL/al.h>
 #include <AL/alc.h>
 #include <array>
-#include <sndfile.hh>
 #include <fstream>
+#include <gev/audio/audio.hpp>
+#include <sndfile.hh>
 
 namespace gev::audio
 {
@@ -13,5 +13,4 @@ namespace gev::audio
   {
     return std::make_unique<audio_host_impl>();
   }
-
-}
+}    // namespace gev::audio

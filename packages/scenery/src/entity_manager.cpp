@@ -21,8 +21,7 @@ namespace gev::scenery
 
     for (auto const& c : _root_entities)
     {
-      auto const found = c->find_by_id(id);
-      if (found)
+      if (auto const found = c->find_by_id(id))
         return found;
     }
     return nullptr;
@@ -34,7 +33,7 @@ namespace gev::scenery
     add_to_parent(target, new_parent);
   }
 
-  void entity_manager::remove_from_parent(std::shared_ptr<entity>const& target)
+  void entity_manager::remove_from_parent(std::shared_ptr<entity> const& target)
   {
     if (target->_parent.expired())
     {
@@ -50,7 +49,7 @@ namespace gev::scenery
     target->_parent.reset();
   }
 
-  void entity_manager::add_to_parent(std::shared_ptr<entity>const& target, std::shared_ptr<entity> parent)
+  void entity_manager::add_to_parent(std::shared_ptr<entity> const& target, std::shared_ptr<entity> parent)
   {
     if (!parent)
       _root_entities.emplace_back(target);
@@ -88,9 +87,15 @@ namespace gev::scenery
       c->update();
   }
 
+  void entity_manager::fixed_update(double time, double delta) const
+  {
+    for (auto const& c : _root_entities)
+      c->fixed_update(time, delta);
+  }
+
   void entity_manager::late_update() const
   {
     for (auto const& c : _root_entities)
       c->late_update();
   }
-}
+}    // namespace gev::scenery

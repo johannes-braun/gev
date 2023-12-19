@@ -1,4 +1,5 @@
 #include "source_allocator.hpp"
+
 #include <AL/al.h>
 #include <bit>
 
@@ -26,9 +27,11 @@ namespace gev::audio
     }
 
     _used_sources.emplace(source);
-    return std::shared_ptr<audio_source_handle>(source, [this](audio_source_handle* hnd) {
-      _used_sources.erase(hnd);
-      _unused_sources.push_back(hnd);
+    return std::shared_ptr<audio_source_handle>(source,
+      [this](audio_source_handle* hnd)
+      {
+        _used_sources.erase(hnd);
+        _unused_sources.push_back(hnd);
       });
   }
 
@@ -49,9 +52,11 @@ namespace gev::audio
     }
 
     _used_buffers.emplace(buffer);
-    return std::shared_ptr<audio_buffer_handle>(buffer, [this](audio_buffer_handle* hnd) {
-      _used_buffers.erase(hnd);
-      _unused_buffers.push_back(hnd);
+    return std::shared_ptr<audio_buffer_handle>(buffer,
+      [this](audio_buffer_handle* hnd)
+      {
+        _used_buffers.erase(hnd);
+        _unused_buffers.push_back(hnd);
       });
   }
 
@@ -93,4 +98,4 @@ namespace gev::audio
   {
     return std::uint32_t(std::bit_cast<std::uintptr_t>(h));
   }
-}
+}    // namespace gev::audio

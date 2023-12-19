@@ -12,4 +12,4 @@ namespace gev::scenery
 
   transform interpolate(transform a, transform const& b, float t);
   transform concat(transform a, transform const& b);
-}
+}    // namespace gev::scenery

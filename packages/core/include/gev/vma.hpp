@@ -1,8 +1,8 @@
 #pragma once
 
 #include <memory>
-#include <vk_mem_alloc.h>
 #include <span>
+#include <vk_mem_alloc.h>
 
 namespace gev
 {
@@ -23,7 +23,7 @@ namespace gev
 
   inline unique_allocation wrap_allocation(shared_allocator allocator, VmaAllocation allocation)
   {
-    return unique_allocation(allocation, vma_allocation_deleter{ std::move(allocator) });
+    return unique_allocation(allocation, vma_allocation_deleter{std::move(allocator)});
   }
 
   template<typename T>
@@ -33,4 +33,4 @@ namespace gev
     vmaMapMemory(allocator.get(), alloc.get(), &memory);
     return std::span(static_cast<T*>(memory), count);
   }
-}
+}    // namespace gev

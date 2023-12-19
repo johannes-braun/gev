@@ -1,25 +1,25 @@
 #include <gev/game/camera.hpp>
+#include <gev/game/layouts.hpp>
 
 namespace gev::game
 {
   camera::camera()
   {
-    _per_frame.set_generator([&](int i) {
-      per_frame_info result;
-      result.descriptor = gev::engine::get().get_descriptor_allocator().allocate(_layout);
-      result.uniform_buffer = std::make_unique<gev::buffer>(
-        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
-        vk::BufferCreateInfo()
-        .setQueueFamilyIndices(gev::engine::get().queues().graphics_family)
-        .setSharingMode(vk::SharingMode::eExclusive)
-        .setSize(sizeof(_view_matrix) + sizeof(_proj_matrix))
-        .setUsage(vk::BufferUsageFlagBits::eUniformBuffer));
-      gev::update_descriptor(result.descriptor, 0, vk::DescriptorBufferInfo()
-        .setBuffer(result.uniform_buffer->get_buffer())
-        .setOffset(0)
-        .setRange(result.uniform_buffer->size()), vk::DescriptorType::eUniformBuffer);
-      return result;
+    _per_frame.set_generator(
+      [&](int i)
+      {
+        per_frame_info result;
+        result.descriptor =
+          gev::engine::get().get_descriptor_allocator().allocate(layouts::defaults().camera_set_layout());
+        result.uniform_buffer = gev::buffer::host_accessible(
+          sizeof(_view_matrix) + sizeof(_proj_matrix), vk::BufferUsageFlagBits::eUniformBuffer);
+        gev::update_descriptor(result.descriptor, 0,
+          vk::DescriptorBufferInfo()
+            .setBuffer(result.uniform_buffer->get_buffer())
+            .setOffset(0)
+            .setRange(result.uniform_buffer->size()),
+          vk::DescriptorType::eUniformBuffer);
+        return result;
       });
   }
 
@@ -35,43 +35,37 @@ namespace gev::game
 
   void camera::set_projection(rnu::mat4 projection)
   {
-    projection[1][1] *= -1;
     _proj_matrix = projection;
   }
 
-  rnu::mat4 camera::view()
+  rnu::mat4 camera::view() const
   {
     return _view_matrix;
   }
 
-  rnu::mat4 camera::projection()
+  rnu::mat4 camera::projection() const
   {
     return _proj_matrix;
   }
 
-  void camera::finalize(frame const& frame, mesh_renderer const& r)
+  vk::DescriptorSet camera::descriptor(int frame_index)
   {
-    _layout = r.camera_set_layout();
-    auto const& f = _per_frame[frame.frame_index];
+    auto& f = _per_frame[frame_index];
 
-    struct matrices
+    f.dirty |= (_view_matrix != f.mat.view_matrix).any() || (_proj_matrix != f.mat.proj_matrix).any();
+
+    if (f.dirty)
     {
-      rnu::mat4 view_matrix;
-      rnu::mat4 proj_matrix;
-    } mats{ _view_matrix, _proj_matrix };
-    f.uniform_buffer->load_data<matrices>(mats);
+      f.mat.view_matrix = _view_matrix;
+      f.mat.proj_matrix = _proj_matrix;
+      f.uniform_buffer->load_data<per_frame_info::matrices>(f.mat);
+    }
+
+    return f.descriptor;
   }
 
-  void camera::bind(frame const& frame, mesh_renderer const& r)
+  void camera::bind(vk::CommandBuffer c, int frame_index, vk::PipelineLayout layout, std::uint32_t binding)
   {
-    auto const& info = _per_frame[frame.frame_index];
-    frame.command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, 
-      r.pipeline_layout(), mesh_renderer::camera_set, info.descriptor, {});
+    c.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout, binding, descriptor(frame_index), {});
   }
-
-  void camera::bind(frame const& frame, vk::PipelineLayout layout) {
-    auto const& info = _per_frame[frame.frame_index];
-    frame.command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-      layout, mesh_renderer::camera_set, info.descriptor, {});
-  }
-}
+}    // namespace gev::game

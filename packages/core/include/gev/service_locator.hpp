@@ -1,8 +1,8 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 namespace gev
 {
@@ -34,11 +34,12 @@ namespace gev
       return std::static_pointer_cast<I>(iter->second);
     }
 
-    void clear() {
+    void clear()
+    {
       _services.clear();
     }
 
   private:
     std::unordered_map<std::size_t, std::shared_ptr<void>> _services;
   };
-}
+}    // namespace gev

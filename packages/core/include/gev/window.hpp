@@ -1,7 +1,7 @@
 #pragma once
 
-#include <memory>
 #include <GLFW/glfw3.h>
+#include <memory>
 
 namespace gev
 {
@@ -13,4 +13,4 @@ namespace gev
     }
   };
   using unique_window = std::unique_ptr<GLFWwindow, glfw_window_deleter>;
-}
+}    // namespace gev

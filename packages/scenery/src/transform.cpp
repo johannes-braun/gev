@@ -50,10 +50,11 @@ namespace gev::scenery
     return a;
   }
 
-  transform concat(transform a, transform const& b) {
+  transform concat(transform a, transform const& b)
+  {
     a.position += b.position;
     a.scale *= b.scale;
     a.rotation *= b.rotation;
     return a;
   }
-}
+}    // namespace gev::scenery

@@ -1,7 +1,7 @@
-#include <gev/game/mesh.hpp>
-#include <rnu/obj.hpp>
 #include <gev/engine.hpp>
+#include <gev/game/mesh.hpp>
 #include <ranges>
+#include <rnu/obj.hpp>
 
 namespace gev::game
 {
@@ -33,9 +33,17 @@ namespace gev::game
     init(tri);
   }
 
+  void mesh::make_skinned(std::span<scenery::joint const> joints)
+  {
+    _joints_buffer = gev::buffer::device_local(joints.size() * sizeof(scenery::joint),
+      vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer);
+    _joints_buffer->load_data<scenery::joint>(joints);
+  }
+
   void mesh::init(rnu::triangulated_object_t const& tri)
   {
     _num_indices = 0;
+    _joints_buffer.reset();
 
     if (tri.indices.empty() || tri.positions.empty())
       return;
@@ -44,47 +52,25 @@ namespace gev::game
 
     if (!_index_buffer || tri.indices.size() * sizeof(std::uint32_t) > _index_buffer->size())
     {
-      _index_buffer = std::make_unique<gev::buffer>(
-        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-        0,
-        vk::BufferCreateInfo()
-        .setQueueFamilyIndices(gev::engine::get().queues().graphics_family)
-        .setSharingMode(vk::SharingMode::eExclusive)
-        .setSize(tri.indices.size() * sizeof(std::uint32_t))
-        .setUsage(vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst));
+      _index_buffer = gev::buffer::device_local(tri.indices.size() * sizeof(std::uint32_t),
+        vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer |
+          vk::BufferUsageFlagBits::eTransferDst);
     }
     if (!_vertex_buffer || tri.positions.size() * sizeof(rnu::vec4) > _vertex_buffer->size())
     {
-      _vertex_buffer = std::make_unique<gev::buffer>(
-        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-        0,
-        vk::BufferCreateInfo()
-        .setQueueFamilyIndices(gev::engine::get().queues().graphics_family)
-        .setSharingMode(vk::SharingMode::eExclusive)
-        .setSize(tri.positions.size() * sizeof(rnu::vec4))
-        .setUsage(vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst));
+      _vertex_buffer = gev::buffer::device_local(tri.positions.size() * sizeof(rnu::vec4),
+        vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer |
+          vk::BufferUsageFlagBits::eTransferDst);
     }
     if (!_normal_buffer || tri.normals.size() * sizeof(rnu::vec3) > _normal_buffer->size())
     {
-      _normal_buffer = std::make_unique<gev::buffer>(
-        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-        0,
-        vk::BufferCreateInfo()
-        .setQueueFamilyIndices(gev::engine::get().queues().graphics_family)
-        .setSharingMode(vk::SharingMode::eExclusive)
-        .setSize(tri.normals.size() * sizeof(rnu::vec3))
-        .setUsage(vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst));
+      _normal_buffer = gev::buffer::device_local(tri.normals.size() * sizeof(rnu::vec3),
+        vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst);
     }
     if (!_texcoords_buffer || tri.texcoords.size() * sizeof(rnu::vec2) > _texcoords_buffer->size())
     {
-      _texcoords_buffer = std::make_unique<gev::buffer>(
-        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-        0,
-        vk::BufferCreateInfo()
-        .setQueueFamilyIndices(gev::engine::get().queues().graphics_family)
-        .setSharingMode(vk::SharingMode::eExclusive)
-        .setSize(tri.texcoords.size() * sizeof(rnu::vec2))
-        .setUsage(vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst));
+      _texcoords_buffer = gev::buffer::device_local(tri.texcoords.size() * sizeof(rnu::vec2),
+        vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst);
     }
 
     _num_indices = tri.indices.size();
@@ -113,8 +99,46 @@ namespace gev::game
     if (_num_indices == 0)
       return;
 
+    if (_joints_buffer)
+    {
+      vk::VertexInputAttributeDescription2EXT const attributes[] = {
+        {0u, 0u, vk::Format::eR32G32B32Sfloat, 0},
+        {1u, 1u, vk::Format::eR32G32B32Sfloat, 0},
+        {2u, 2u, vk::Format::eR32G32Sfloat, 0},
+        {3u, 3u, vk::Format::eR16G16B16A16Uint, 0},
+        {4u, 3u, vk::Format::eR32G32B32A32Sfloat, sizeof(rnu::vec4ui16)},
+      };
+      vk::VertexInputBindingDescription2EXT const bindings[] = {
+        {0u, sizeof(rnu::vec4), vk::VertexInputRate::eVertex, 1},
+        {1u, sizeof(rnu::vec3), vk::VertexInputRate::eVertex, 1},
+        {2u, sizeof(rnu::vec2), vk::VertexInputRate::eVertex, 1},
+        {3u, sizeof(scenery::joint), vk::VertexInputRate::eVertex, 1},
+      };
+      c.setVertexInputEXT(bindings, attributes);
+      c.bindVertexBuffers(0,
+        {_vertex_buffer->get_buffer(), _normal_buffer->get_buffer(), _texcoords_buffer->get_buffer(),
+          _joints_buffer->get_buffer()},
+        {0ull, 0ull, 0ull, 0ull});
+    }
+    else
+    {
+      vk::VertexInputAttributeDescription2EXT const attributes[] = {
+        {0u, 0u, vk::Format::eR32G32B32Sfloat, 0},
+        {1u, 1u, vk::Format::eR32G32B32Sfloat, 0},
+        {2u, 2u, vk::Format::eR32G32Sfloat, 0},
+      };
+      vk::VertexInputBindingDescription2EXT const bindings[] = {
+        {0u, sizeof(rnu::vec4), vk::VertexInputRate::eVertex, 1},
+        {1u, sizeof(rnu::vec3), vk::VertexInputRate::eVertex, 1},
+        {2u, sizeof(rnu::vec2), vk::VertexInputRate::eVertex, 1},
+      };
+      c.setVertexInputEXT(bindings, attributes);
+      c.bindVertexBuffers(0,
+        {_vertex_buffer->get_buffer(), _normal_buffer->get_buffer(), _texcoords_buffer->get_buffer()},
+        {0ull, 0ull, 0ull});
+    }
+
     c.bindIndexBuffer(_index_buffer->get_buffer(), 0, vk::IndexType::eUint32);
-    c.bindVertexBuffers(0, { _vertex_buffer->get_buffer(), _normal_buffer->get_buffer(), _texcoords_buffer->get_buffer() }, { 0ull, 0ull, 0ull });
     c.drawIndexed(_num_indices, instance_count, 0, 0, base_instance);
   }
 
@@ -147,4 +171,9 @@ namespace gev::game
   {
     return *_texcoords_buffer;
   }
-}
+
+  gev::buffer const* mesh::joints_buffer() const
+  {
+    return _joints_buffer.get();
+  }
+}    // namespace gev::game
