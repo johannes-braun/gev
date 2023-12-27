@@ -10,6 +10,7 @@ namespace gev::scenery
   std::shared_ptr<entity> entity_manager::instantiate(std::size_t id, std::shared_ptr<entity> parent)
   {
     auto r = std::make_shared<entity>(id);
+    r->_manager = shared_from_this();
     add_to_parent(r, parent);
     return r;
   }
@@ -27,6 +28,12 @@ namespace gev::scenery
     return nullptr;
   }
 
+  void entity_manager::destroy(std::shared_ptr<entity> e)
+  {
+    remove_from_parent(e);
+    e->despawn();
+  }
+
   void entity_manager::reparent(std::shared_ptr<entity> const& target, std::shared_ptr<entity> new_parent)
   {
     remove_from_parent(target);
@@ -38,13 +45,17 @@ namespace gev::scenery
     if (target->_parent.expired())
     {
       // this was a root node. remove from list
-      _root_entities.erase(std::remove(begin(_root_entities), end(_root_entities), target));
+      auto const found = std::remove(begin(_root_entities), end(_root_entities), target);
+      if (found != end(_root_entities))
+        _root_entities.erase(found);
     }
     else
     {
       auto const parent = target->_parent.lock();
       // this was not a root node. remove from parent's children list
-      parent->_children.erase(std::remove(begin(parent->_children), end(parent->_children), target));
+      auto const found = std::remove(begin(parent->_children), end(parent->_children), target);
+      if (found != end(parent->_children))
+        parent->_children.erase(found);
     }
     target->_parent.reset();
   }
@@ -71,8 +82,15 @@ namespace gev::scenery
 
   void entity_manager::spawn() const
   {
+    apply_transform();
     for (auto const& c : _root_entities)
       c->spawn();
+  }
+
+  void entity_manager::despawn()
+  {
+    while (!_root_entities.empty())
+      destroy(_root_entities.back());
   }
 
   void entity_manager::early_update() const

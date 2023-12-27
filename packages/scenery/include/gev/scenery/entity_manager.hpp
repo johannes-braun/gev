@@ -5,7 +5,7 @@
 
 namespace gev::scenery
 {
-  class entity_manager
+  class entity_manager : public std::enable_shared_from_this<entity_manager>
   {
   public:
     std::shared_ptr<entity> instantiate(std::shared_ptr<entity> parent = nullptr);
@@ -17,7 +17,10 @@ namespace gev::scenery
       return _root_entities;
     }
 
+    void destroy(std::shared_ptr<entity> e);
+
     void spawn() const;
+    void despawn();
     void early_update() const;
     void fixed_update(double time, double delta) const;
     void update() const;

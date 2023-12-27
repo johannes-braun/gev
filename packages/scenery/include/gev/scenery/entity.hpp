@@ -8,6 +8,7 @@
 namespace gev::scenery
 {
   class component;
+  class entity_manager;
 
   class entity : public std::enable_shared_from_this<entity>
   {
@@ -67,8 +68,11 @@ namespace gev::scenery
       return nullptr;
     }
 
+    void erase(std::shared_ptr<component> comp);
+
     std::size_t id() const;
     void spawn() const;
+    void despawn() const;
     void early_update() const;
     void update() const;
     void fixed_update(double time, double delta) const;
@@ -77,11 +81,15 @@ namespace gev::scenery
     void set_active(bool active);
     bool is_inherited_active() const;
     bool is_active() const;
+    void collides(std::shared_ptr<entity> other, float distance, rnu::vec3 point_on_self, rnu::vec3 point_on_other) const;
+
     std::span<std::shared_ptr<entity> const> children() const;
 
     transform const& global_transform() const;
 
     std::shared_ptr<entity> parent() const;
+
+    std::shared_ptr<entity_manager> manager() const;
 
   private:
     void activate(bool propagate_to_children = true) const;
@@ -94,5 +102,6 @@ namespace gev::scenery
     transform _global_transform;
     std::vector<std::shared_ptr<component>> _components;
     std::vector<std::shared_ptr<entity>> _children;
+    std::weak_ptr<entity_manager> _manager;
   };
 }    // namespace gev::scenery

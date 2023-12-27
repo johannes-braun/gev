@@ -31,8 +31,8 @@ namespace gev::game
     void set_camera(std::shared_ptr<camera> cam);
     std::shared_ptr<camera> const& get_camera() const;
 
-    void render(std::int32_t x, std::int32_t y, std::uint32_t w, std::uint32_t h, pass_id pass,
-      vk::SampleCountFlagBits samples, frame const& frame);
+    void render(vk::CommandBuffer c, std::int32_t x, std::int32_t y, std::uint32_t w, std::uint32_t h, pass_id pass,
+      vk::SampleCountFlagBits samples);
 
     std::shared_ptr<shadow_map_holder> get_shadow_map_holder() const;
     std::shared_ptr<mesh_batch> batch(std::shared_ptr<shader> const& shader, std::shared_ptr<material> const& material);

@@ -3,6 +3,70 @@
 
 namespace gev
 {
+  image_creator image_creator::get()
+  {
+    return image_creator();
+  }
+
+  image_creator::image_creator()
+  {
+    _info.setArrayLayers(1)
+      .setExtent({1, 1, 1})
+      .setFormat(vk::Format::eR8G8Unorm)
+      .setImageType(vk::ImageType::e2D)
+      .setInitialLayout(vk::ImageLayout::eUndefined)
+      .setMipLevels(1)
+      .setSamples(vk::SampleCountFlagBits::e1)
+      .setSharingMode(vk::SharingMode::eExclusive)
+      .setTiling(vk::ImageTiling::eOptimal);
+  }
+
+  image_creator& image_creator::size(std::uint32_t w, std::uint32_t h, std::uint32_t d)
+  {
+    _info.setExtent({w, h, d});
+    return *this;
+  }
+  image_creator& image_creator::format(vk::Format fmt)
+  {
+    _info.setFormat(fmt);
+    return *this;
+  }
+  image_creator& image_creator::type(vk::ImageType t)
+  {
+    _info.setImageType(t);
+    return *this;
+  }
+  image_creator& image_creator::layers(std::uint32_t lay)
+  {
+    _info.setArrayLayers(lay);
+    return *this;
+  }
+  image_creator& image_creator::levels(std::uint32_t lev)
+  {
+    _info.setMipLevels(lev);
+    return *this;
+  }
+  image_creator& image_creator::samples(vk::SampleCountFlagBits s)
+  {
+    _info.setSamples(s);
+    return *this;
+  }
+  image_creator& image_creator::flags(vk::ImageCreateFlags f)
+  {
+    _info.flags |= f;
+    return *this;
+  }
+  image_creator& image_creator::usage(vk::ImageUsageFlags flags)
+  {
+    _info.usage |= flags;
+    return *this;
+  }
+
+  std::unique_ptr<image> image_creator::build()
+  {
+    return std::make_unique<image>(_info);
+  }
+
   std::uint32_t mip_levels_for(int w, int h, int d)
   {
     return std::uint32_t(std::log2(std::max(w, std::max(h, d))) + 1);

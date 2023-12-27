@@ -11,6 +11,9 @@
 #include <gev/imgui/imgui.h>
 #include <gev/imgui/imgui_impl_glfw.h>
 #include <gev/imgui/imgui_impl_vulkan.h>
+#include <gev/audio/audio.hpp>
+#include <gev/scenery/entity_manager.hpp>
+#include <gev/scenery/collider.hpp>
 #include <print>
 #include <ranges>
 #include <sstream>
@@ -44,6 +47,42 @@ namespace gev
     int _index = 0;
     bool _done = false;
   };
+
+  void frame::present_image(image& source) const
+  {
+    assert(source.extent() == output_image->extent());
+
+    auto const samples = source.samples();
+    auto const image_size = output_image->extent();
+    if (samples == vk::SampleCountFlagBits::e1)
+    {
+      source.layout(command_buffer, vk::ImageLayout::eTransferSrcOptimal, vk::PipelineStageFlagBits2::eBlit,
+        vk::AccessFlagBits2::eMemoryRead);
+      output_image->layout(command_buffer, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits2::eBlit,
+        vk::AccessFlagBits2::eMemoryWrite);
+      command_buffer.blitImage(source.get_image(), vk::ImageLayout::eTransferSrcOptimal, output_image->get_image(),
+        vk::ImageLayout::eTransferDstOptimal,
+        vk::ImageBlit()
+          .setSrcSubresource(vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1))
+          .setSrcOffsets({vk::Offset3D(0, 0, 0), vk::Offset3D(image_size.width, image_size.height, 1)})
+          .setDstSubresource(vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1))
+          .setDstOffsets({vk::Offset3D(0, 0, 0), vk::Offset3D(image_size.width, image_size.height, 1)}),
+        vk::Filter::eLinear);
+    }
+    else
+    {
+      source.layout(command_buffer, vk::ImageLayout::eTransferSrcOptimal, vk::PipelineStageFlagBits2::eResolve,
+        vk::AccessFlagBits2::eMemoryRead);
+      output_image->layout(command_buffer, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits2::eResolve,
+        vk::AccessFlagBits2::eMemoryWrite);
+      command_buffer.resolveImage(source.get_image(), vk::ImageLayout::eTransferSrcOptimal, output_image->get_image(),
+        vk::ImageLayout::eTransferDstOptimal,
+        vk::ImageResolve()
+          .setExtent(image_size)
+          .setSrcSubresource(vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1))
+          .setDstSubresource(vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1)));
+    }
+  }
 
   std::unique_ptr<engine> engine::_engine = std::unique_ptr<engine>(new engine);
 
@@ -188,7 +227,10 @@ namespace gev
       select_format({vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint, vk::Format::eD16UnormS8Uint},
         vk::ImageTiling::eOptimal, vk::FormatFeatureFlagBits::eDepthStencilAttachment);
 
-    _audio_host = audio::audio_host::create();
+    _services.register_existing_service<audio::audio_host>(audio::audio_host::create());
+    register_service<scenery::entity_manager>();
+    register_service<scenery::collision_system>();
+    register_service<audio_repo>();
   }
 
   VkBool32 engine::debug_message_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -218,6 +260,14 @@ namespace gev
     cballoc.commandPool = _queues.graphics_command_pool.get();
     cballoc.level = vk::CommandBufferLevel::ePrimary;
     auto const cbufs = _device->allocateCommandBuffersUnique(cballoc);
+    auto const entity_manager = gev::service<gev::scenery::entity_manager>();
+    auto const collision_system = gev::service<gev::scenery::collision_system>();
+
+    double fixed_update_time = 0.0;
+    double fixed_update_target = 0.0;
+    double fixed_update_step = 0.001;
+
+    bool first_frame = true;
 
     std::uint32_t current_frame = 0;
     double last_time = glfwGetTime();
@@ -254,11 +304,32 @@ namespace gev
       ImGui_ImplGlfw_NewFrame();
       ImGui::NewFrame();
 
+      if (first_frame)
+      {
+        entity_manager->spawn();
+        first_frame = false;
+      }
+
       _current_frame.delta_time = delta;
       _current_frame.frame_index = current_frame;
       _current_frame.output_image = frame.output_image;
       _current_frame.output_view = frame.output_view.get();
       _current_frame.command_buffer = c;
+
+      entity_manager->apply_transform();
+      entity_manager->early_update();
+      double const target = fixed_update_target + delta;
+      for (double t = fixed_update_time; t < target; t += fixed_update_step)
+      {
+        entity_manager->fixed_update(t, fixed_update_step);
+        collision_system->fixed_step(fixed_update_step);
+        fixed_update_time += fixed_update_step;
+      }
+      fixed_update_target = target;
+      collision_system->sync(target - fixed_update_time);
+
+      entity_manager->update();
+      entity_manager->late_update();
       if (!runnable(_current_frame))
       {
         glfwSetWindowShouldClose(_window.get(), true);
@@ -310,12 +381,14 @@ namespace gev
     }
 
     _device->waitIdle();
+     entity_manager->despawn();
     return 0;
   }
 
   engine::~engine()
   {
     _device->waitIdle();
+    _services.erase<audio_repo>();
     _services.clear();
     ImGui_ImplGlfw_Shutdown();
     ImGui_ImplVulkan_Shutdown();
@@ -494,7 +567,8 @@ namespace gev
     ft12.pNext = &extd3;
 
     const std::array required_device_extensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_SHADER_CLOCK_EXTENSION_NAME,
-      VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME, VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME};
+      VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME, VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
+      VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME};
 
     std::vector<const char*> found_device_extensions;
     for (auto const& req : required_device_extensions)
@@ -651,7 +725,8 @@ namespace gev
     sc_info.minImageCount = std::clamp(
       requested_num_swapchain_images, caps.surfaceCapabilities.minImageCount, caps.surfaceCapabilities.maxImageCount);
     sc_info.imageArrayLayers = 1;
-    sc_info.imageUsage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eColorAttachment;
+    sc_info.imageUsage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eColorAttachment |
+      vk::ImageUsageFlagBits::eSampled;
     sc_info.imageSharingMode = vk::SharingMode::eExclusive;
     sc_info.imageExtent = caps.surfaceCapabilities.currentExtent;
     sc_info.oldSwapchain = *_swapchain;
@@ -723,11 +798,6 @@ namespace gev
 
     for (auto& callback : _resize_callbacks)
       callback(_swapchain_size.width, _swapchain_size.height);
-  }
-
-  audio::audio_host& engine::audio_host() const
-  {
-    return *_audio_host;
   }
 
   descriptor_allocator& engine::get_descriptor_allocator()

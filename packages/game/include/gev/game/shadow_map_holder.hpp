@@ -54,6 +54,7 @@ namespace gev::game
     struct sm_info
     {
       rnu::mat4 matrix;
+      rnu::mat4 inverse_matrix;
       int map_id;
       int metadata0;    // TBD
       int metadata1;    // TBD

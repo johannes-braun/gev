@@ -36,35 +36,13 @@ target_link_libraries(gev.vulkan INTERFACE glfw)
 target_link_libraries(gev.vulkan INTERFACE unofficial::vulkan-memory-allocator::vulkan-memory-allocator ${VK_LIBRARIES})
 target_compile_definitions(gev.vulkan INTERFACE VK_NO_PROTOTYPES VULKAN_HPP_STORAGE_SHARED)
 
-#Manually Create ImGui Library
-add_library(gev.imgui SHARED)
-target_sources(gev.imgui PRIVATE
-  "libraries/imgui/imgui.cpp"
-  "libraries/imgui/imgui.cpp"
-  "libraries/imgui/imgui_demo.cpp"
-  "libraries/imgui/imgui_draw.cpp"
-  "libraries/imgui/backends/imgui_impl_vulkan.cpp"
-  "libraries/imgui/backends/imgui_impl_glfw.cpp"
-  "libraries/imgui/imgui_tables.cpp"
-  "libraries/imgui/imgui_widgets.cpp"    )
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/imgui/include/gev/imgui)
-file(COPY
-    "libraries/imgui/imgui.h"
-    "libraries/imgui/imconfig.h"
-    "libraries/imgui/backends/imgui_impl_vulkan.h"
-    "libraries/imgui/backends/imgui_impl_glfw.h"
-  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/imgui/include/gev/imgui)
-target_include_directories(gev.imgui PRIVATE BEFORE "libraries/imgui")
-target_include_directories(gev.imgui PUBLIC BEFORE ${CMAKE_CURRENT_BINARY_DIR}/imgui/include)
-target_link_libraries(gev.imgui PUBLIC gev.vulkan glfw)
-#End Create ImGui Library
-
 define_property(TARGET PROPERTY 
   SPIRV_FILES)
 define_property(TARGET PROPERTY 
   SPIRV_FILES_REL)
-
+  
 add_subdirectory(libraries/rnu)
+add_subdirectory(packages/imgui)
 add_subdirectory(packages/core)
 add_subdirectory(packages/scenery)
 add_subdirectory(packages/audio)

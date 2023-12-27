@@ -7,11 +7,12 @@
 
 #include <any>
 #include <functional>
-#include <gev/audio/audio.hpp>
+#include <gev/audio/sound.hpp>
 #include <gev/descriptors.hpp>
 #include <gev/image.hpp>
 #include <gev/imgui/imgui.h>
 #include <gev/logger.hpp>
+#include <gev/repo.hpp>
 #include <gev/service_locator.hpp>
 #include <gev/vma.hpp>
 #include <gev/window.hpp>
@@ -54,7 +55,11 @@ namespace gev
     std::shared_ptr<image> output_image;
     vk::ImageView output_view;
     vk::CommandBuffer command_buffer;
+
+    void present_image(image& source) const;
   };
+
+  using audio_repo = repo<audio::sound>;
 
   class engine
   {
@@ -93,7 +98,6 @@ namespace gev
 
     service_locator& services();
     logger& logger();
-    audio::audio_host& audio_host() const;
 
     frame const& current_frame() const;
 
@@ -142,9 +146,20 @@ namespace gev
     std::vector<std::function<void(int w, int h)>> _resize_callbacks;
 
     vk::UniqueDescriptorPool _imgui_descriptor_pool;
-    std::unique_ptr<audio::audio_host> _audio_host;
     service_locator _services;
 
     ImGuiContext* _imgui_context = nullptr;
   };
+
+  template<typename Svc, typename... Args>
+  std::shared_ptr<Svc> register_service(Args&&... args)
+  {
+    return gev::engine::get().services().register_service<Svc>(std::forward<Args>(args)...);
+  }
+
+  template<typename Svc>
+  std::shared_ptr<Svc> service()
+  {
+    return gev::engine::get().services().resolve<Svc>();
+  }
 }    // namespace gev

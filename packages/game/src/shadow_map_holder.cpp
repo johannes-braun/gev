@@ -25,8 +25,10 @@ namespace gev::game
 
     if ((matrix != info.matrix).any())
     {
-      std::memcpy(begin, matrix.data(), sizeof(rnu::mat4));
-      include_update_region(offset, offset + sizeof(rnu::mat4));
+      info.matrix = matrix;
+      info.inverse_matrix = inverse(matrix);
+      std::memcpy(begin, &info, 2 * sizeof(rnu::mat4));
+      include_update_region(offset, offset + 2 * sizeof(rnu::mat4));
     }
   }
 

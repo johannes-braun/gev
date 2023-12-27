@@ -12,11 +12,12 @@ public:
 
   vk::DescriptorSet skin_descriptor() const;
   void early_update() override;
-  void update() override;
+
+  void set_animation(std::string name);
+  std::unordered_map<std::string, gev::scenery::joint_animation> const& animations() const;
 
 private:
   void apply_child_transform(gev::scenery::entity& e);
-  void collect_child_transform(gev::scenery::entity& e);
 
   std::string _current_animation = "";
   bool _running = false;
@@ -26,5 +27,4 @@ private:
   gev::scenery::skin _skin;
   gev::scenery::transform_tree _tree;
   std::unordered_map<std::string, gev::scenery::joint_animation> _animations;
-  std::vector<rnu::mat4> _joint_transforms;
 };

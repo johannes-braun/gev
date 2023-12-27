@@ -29,10 +29,11 @@ namespace gev
       vk::PipelineLayoutCreateInfo().setSetLayouts(descriptors).setPushConstantRanges(push_constant_ranges));
   }
 
-  vk::UniquePipeline build_compute_pipeline(vk::PipelineLayout layout, vk::ShaderModule module, char const* entry)
+  vk::UniquePipeline build_compute_pipeline(
+    vk::PipelineLayout layout, vk::ShaderModule module, char const* entry, vk::SpecializationInfo* spec)
   {
     vk::ComputePipelineCreateInfo ci;
-    ci.setStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, module, entry));
+    ci.setStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, module, entry, spec));
     ci.setLayout(layout);
     return gev::engine::get().device().createComputePipelineUnique(nullptr, ci).value;
   }

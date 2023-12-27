@@ -38,18 +38,13 @@ namespace gev::game
     std::uint32_t sy = std::max(4, (int)std::ceil(bounds.size.y / step_size));
     std::uint32_t sz = std::max(4, (int)std::ceil(bounds.size.z / step_size));
 
-    auto result = std::make_unique<gev::image>(
-      vk::ImageCreateInfo()
-        .setFormat(vk::Format::eR16Sfloat)
-        .setArrayLayers(1)
-        .setExtent({sx, sy, sz})
-        .setImageType(vk::ImageType::e3D)
-        .setInitialLayout(vk::ImageLayout::eUndefined)
-        .setMipLevels(1)
-        .setSamples(vk::SampleCountFlagBits::e1)
-        .setTiling(vk::ImageTiling::eOptimal)
-        .setSharingMode(vk::SharingMode::eExclusive)
-        .setUsage(vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled));
+    auto result =
+      gev::image_creator::get()
+        .format(vk::Format::eR16Sfloat)
+        .size(sx, sy, sz)
+        .type(vk::ImageType::e3D)
+        .usage(vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled)
+        .build();
 
     std::unique_ptr<distance_field> field = std::make_unique<distance_field>(std::move(result), bounds);
 

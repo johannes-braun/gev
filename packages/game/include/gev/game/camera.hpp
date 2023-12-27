@@ -18,8 +18,8 @@ namespace gev::game
     rnu::mat4 view() const;
     rnu::mat4 projection() const;
 
-    vk::DescriptorSet descriptor(int frame_index);
-    void bind(vk::CommandBuffer c, int frame_index, vk::PipelineLayout layout, std::uint32_t binding);
+    vk::DescriptorSet descriptor();
+    void bind(vk::CommandBuffer c, vk::PipelineLayout layout, std::uint32_t binding);
 
   private:
     rnu::mat4 _view_matrix;
@@ -31,12 +31,14 @@ namespace gev::game
       {
         rnu::mat4 view_matrix = {};
         rnu::mat4 proj_matrix = {};
+        rnu::mat4 inverse_view_matrix = {};
+        rnu::mat4 inverse_proj_matrix = {};
       } mat;
 
       vk::DescriptorSet descriptor;
       std::unique_ptr<gev::buffer> uniform_buffer;
       bool dirty = true;
     };
-    gev::per_frame<per_frame_info> _per_frame;
+    per_frame_info _per_frame;
   };
 }    // namespace gev::game

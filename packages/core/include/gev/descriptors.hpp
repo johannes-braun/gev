@@ -30,6 +30,8 @@ namespace gev
     descriptor_layout_creator& bind(std::uint32_t binding, vk::DescriptorType type, vk::ShaderStageFlags stage_flags,
       vk::DescriptorBindingFlags flags = {}, vk::ArrayProxy<vk::Sampler> immutable_samplers = nullptr);
 
+    descriptor_layout_creator& flags(vk::DescriptorSetLayoutCreateFlags f);
+
     vk::UniqueDescriptorSetLayout build();
 
   private:
@@ -37,6 +39,7 @@ namespace gev
     std::vector<vk::Sampler> _samplers;
     std::vector<vk::DescriptorSetLayoutBinding> _bindings;
     std::vector<vk::DescriptorBindingFlags> _flags;
+    vk::DescriptorSetLayoutCreateFlags _layout_flags;
   };
 
   class descriptor_allocator

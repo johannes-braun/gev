@@ -3,6 +3,7 @@
 layout(location = 2) in vec2 vertex_texcoord;
 
 layout(set = 1, binding = 0) uniform sampler2D diffuse_texture;
+layout(location = 0) out vec4 color;
 
 mat4 thresholdMatrix =
 mat4(
@@ -14,10 +15,9 @@ mat4(
 
 void main()
 {
-  vec4 diffuse_texture_color = texture(diffuse_texture, vertex_texcoord);
-  ivec2 px = ivec2(gl_FragCoord.xy);
-
-  float a = diffuse_texture_color.a;
-  if(a < thresholdMatrix[(px.x) % 4][(px.y) % 4])
-    discard;
+  float depth = gl_FragCoord.z;
+  float dx = dFdx(depth);
+  float dy = dFdy(depth);
+  float moment2 = depth * depth + 0.25 * (dx * dx + dy * dy);
+  color = vec4(depth, moment2, 0, 0);
 }

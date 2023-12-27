@@ -5,7 +5,7 @@ void camera_controller::spawn()
   _camera = owner()->get<camera_component>();
   if (auto c = _camera.lock())
   {
-    auto const r = gev::engine::get().services().resolve<gev::game::mesh_renderer>();
+    auto const r = gev::service<gev::game::mesh_renderer>();
     r->set_camera(c->camera());
   }
 }
@@ -13,6 +13,7 @@ void camera_controller::spawn()
 void camera_controller::update()
 {
   _base_camera.set_position(owner()->global_transform().position);
+  _base_camera.replace_rotation(owner()->global_transform().rotation);
 
   auto const window = gev::engine::get().window();
   auto const w = gev::engine::get().swapchain_size().width;

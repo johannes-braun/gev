@@ -58,4 +58,24 @@ namespace gev
     vk::ImageLayout _layout = vk::ImageLayout::eUndefined;
     std::uint32_t _queue_family_index = VK_QUEUE_FAMILY_EXTERNAL;
   };
+
+  class image_creator
+  {
+  public:
+    static image_creator get();
+    image_creator& size(std::uint32_t w, std::uint32_t h = 1u, std::uint32_t d = 1u);
+    image_creator& format(vk::Format fmt);
+    image_creator& type(vk::ImageType t);
+    image_creator& layers(std::uint32_t lay);
+    image_creator& levels(std::uint32_t lev);
+    image_creator& samples(vk::SampleCountFlagBits s);
+    image_creator& usage(vk::ImageUsageFlags flags);
+    image_creator& flags(vk::ImageCreateFlags f);
+    std::unique_ptr<image> build();
+
+  private:
+    image_creator();
+
+    vk::ImageCreateInfo _info;
+  };
 }    // namespace gev

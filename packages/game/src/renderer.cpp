@@ -5,53 +5,39 @@ namespace gev::game
 {
   void renderer::rebuild_attachments()
   {
+    _rebuild_attachments = true;
+  }
+
+  void renderer::force_build_attachments()
+  {
+    if (!_rebuild_attachments)
+      return;
+
+    _rebuild_attachments = false;
+
     gev::engine::get().device().waitIdle();
-    _per_frame_depths.reset();
-    _per_frame_colors.reset();
+    auto const size = _render_size;
+    
+    _depth_target.image =
+      gev::image_creator::get()
+        .size(size.width, size.height)
+        .type(vk::ImageType::e2D)
+        .samples(_samples)
+        .usage(vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled |
+          vk::ImageUsageFlagBits::eTransferSrc)
+        .format(_depth_format)
+        .build();
+    _depth_target.view = _depth_target.image->create_view(vk::ImageViewType::e2D);
 
-    _per_frame_depths.set_generator(
-      [&](int i)
-      {
-        auto const size = _render_size;
-        render_attachment idx;
-        idx.image = std::make_shared<gev::image>(
-          vk::ImageCreateInfo()
-            .setFormat(gev::engine::get().depth_format())
-            .setArrayLayers(1)
-            .setExtent({size.width, size.height, 1})
-            .setImageType(vk::ImageType::e2D)
-            .setInitialLayout(vk::ImageLayout::eUndefined)
-            .setMipLevels(1)
-            .setSamples(_samples)
-            .setTiling(vk::ImageTiling::eOptimal)
-            .setSharingMode(vk::SharingMode::eExclusive)
-            .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled |
-              vk::ImageUsageFlagBits::eTransferSrc));
-        idx.view = idx.image->create_view(vk::ImageViewType::e2D);
-        return idx;
-      });
-
-    _per_frame_colors.set_generator(
-      [&](int i)
-      {
-        auto const size = _render_size;
-        render_attachment idx;
-        idx.image = std::make_shared<gev::image>(
-          vk::ImageCreateInfo()
-            .setFormat(gev::engine::get().swapchain_format().surfaceFormat.format)
-            .setArrayLayers(1)
-            .setExtent({size.width, size.height, 1})
-            .setImageType(vk::ImageType::e2D)
-            .setInitialLayout(vk::ImageLayout::eUndefined)
-            .setMipLevels(1)
-            .setSamples(_samples)
-            .setTiling(vk::ImageTiling::eOptimal)
-            .setSharingMode(vk::SharingMode::eExclusive)
-            .setUsage(vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled |
-              vk::ImageUsageFlagBits::eTransferSrc));
-        idx.view = idx.image->create_view(vk::ImageViewType::e2D);
-        return idx;
-      });
+    _color_target.image =
+      gev::image_creator::get()
+        .size(size.width, size.height)
+        .type(vk::ImageType::e2D)
+        .samples(_samples)
+        .usage(_color_usage_flags)
+        .format(_color_format)
+        .build();
+    _color_target.view = _color_target.image->create_view(vk::ImageViewType::e2D);
   }
 
   void renderer::set_render_size(vk::Extent2D size)
@@ -76,6 +62,11 @@ namespace gev::game
   {
     set_render_size(size);
     set_samples(samples);
+    set_color_usage(vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled |
+      vk::ImageUsageFlagBits::eTransferSrc);
+
+    set_color_format(gev::engine::get().swapchain_format().surfaceFormat.format);
+    set_depth_format(gev::engine::get().depth_format());
 
     rebuild_attachments();
     _color_attachment =
@@ -91,41 +82,88 @@ namespace gev::game
         .setStoreOp(vk::AttachmentStoreOp::eStore);
   }
 
-  std::shared_ptr<gev::image> renderer::color_image(int frame_index)
+  void renderer::set_color_format(vk::Format fmt)
   {
-    auto const& index = _per_frame_colors[frame_index];
-    return index.image;
+    if (_color_format != fmt)
+    {
+      _color_format = fmt;
+      rebuild_attachments();
+    }
   }
 
-  std::shared_ptr<gev::image> renderer::depth_image(int frame_index)
+  void renderer::set_depth_format(vk::Format fmt)
   {
-    auto const& index = _per_frame_depths[frame_index];
-    return index.image;
+    if (_depth_format != fmt)
+    {
+      _depth_format = fmt;
+      rebuild_attachments();
+    }
   }
 
-  void renderer::prepare_frame(frame const& f, bool use_depth, bool use_color)
+  void renderer::set_clear_color(rnu::vec4 color)
   {
-    auto const& frame = f;
-    auto const& c = frame.command_buffer;
+    _color_attachment.clearValue.color.setFloat32({color.r, color.g, color.b, color.a});
+  }
+
+  std::shared_ptr<gev::image> renderer::color_image()
+  {
+    force_build_attachments();
+    return _color_target.image;
+  }
+
+  std::shared_ptr<gev::image> renderer::depth_image()
+  {
+    force_build_attachments();
+    return _depth_target.image;
+  }
+
+  vk::ImageView renderer::color_image_view()
+  {
+    force_build_attachments();
+    return _color_target.view.get();
+  }
+
+  vk::ImageView renderer::depth_image_view()
+  {
+    force_build_attachments();
+    return _depth_target.view.get();
+  }
+
+  void renderer::set_color_usage(vk::ImageUsageFlags flags)
+  {
+    if (_color_usage_flags != flags)
+    {
+      _color_usage_flags = flags;
+      rebuild_attachments();
+    }
+  }
+
+  void renderer::add_color_usage(vk::ImageUsageFlags flags)
+  {
+    set_color_usage(_color_usage_flags | flags);
+  }
+
+  void renderer::prepare_frame(vk::CommandBuffer c, bool use_depth, bool use_color)
+  {
+    force_build_attachments();
 
     if (use_depth)
     {
-      auto const& dep = _per_frame_depths[frame.frame_index];
-      dep.image->layout(c, vk::ImageLayout::eDepthStencilAttachmentOptimal,
+      _depth_target.image->layout(c, vk::ImageLayout::eDepthStencilAttachmentOptimal,
         vk::PipelineStageFlagBits2::eLateFragmentTests,
         vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
         gev::engine::get().queues().graphics_family);
-      _depth_attachment.setImageView(dep.view.get()).setLoadOp(vk::AttachmentLoadOp::eClear);
+      _depth_attachment.setImageView(_depth_target.view.get()).setLoadOp(vk::AttachmentLoadOp::eClear);
     }
 
     if (use_color)
     {
-      auto const& col = _per_frame_colors[frame.frame_index];
-      col.image->layout(c, vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+      _color_target.image->layout(c, vk::ImageLayout::eColorAttachmentOptimal,
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
         vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite,
         gev::engine::get().queues().graphics_family);
 
-      _color_attachment.setImageView(col.view.get()).setLoadOp(vk::AttachmentLoadOp::eClear);
+      _color_attachment.setImageView(_color_target.view.get()).setLoadOp(vk::AttachmentLoadOp::eClear);
     }
 
     _current_pipeline_layout = nullptr;

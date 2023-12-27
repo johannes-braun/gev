@@ -25,10 +25,11 @@ namespace gev::audio
     bool is_paused() const;
 
     void set_looping(bool loops) const;
-    bool is_looping() const;
     void set_volume(float v) const;
-    float get_volume() const;
     void set_pitch(float p) const;
+
+    bool is_looping() const;
+    float get_volume() const;
     float get_pitch() const;
 
     void set_position(rnu::vec3 position) const;

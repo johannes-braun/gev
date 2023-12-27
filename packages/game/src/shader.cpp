@@ -17,16 +17,14 @@ namespace gev::game
     _force_rebuild = true;
   }
 
-  void shader::set_samples(vk::SampleCountFlagBits samples)
+  void shader::bind(vk::CommandBuffer c, pass_id pass)
   {
-    if (samples != _render_samples)
-    {
-      _render_samples = samples;
-      invalidate();
-    }
+    c.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline(pass));
+    for (auto const& [i, set] : _global_bindings)
+      attach(c, set, i);
   }
 
-  void shader::bind(vk::CommandBuffer c, pass_id pass)
+  vk::Pipeline shader::pipeline(pass_id pass)
   {
     if (_force_rebuild || !_layout)
     {
@@ -41,24 +39,12 @@ namespace gev::game
       _pipelines[std::size_t(pass)] = rebuild(pass);
     }
 
-    c.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline(pass));
-    for (auto const& [i, set] : _global_bindings)
-      attach(c, set, i);
-  }
-
-  vk::Pipeline shader::pipeline(pass_id pass) const
-  {
     return _pipelines[std::size_t(pass)].get();
   }
 
   vk::PipelineLayout shader::layout() const
   {
     return _layout.get();
-  }
-
-  vk::SampleCountFlagBits shader::render_samples() const
-  {
-    return _render_samples;
   }
 
   void shader::attach_always(vk::DescriptorSet set, std::uint32_t index)
@@ -99,7 +85,9 @@ namespace gev::game
       auto const vertex_shader = _skinned ?
         create_shader(load_spv(gev_game_shaders::shaders::shader2_rig_vert)) :
         create_shader(load_spv(gev_game_shaders::shaders::shader2_vert));
-      auto const fragment_shader = create_shader(load_spv(gev_game_shaders::shaders::shader2_frag));
+      auto const fragment_shader = pass == pass_id::shadow ?
+        create_shader(load_spv(gev_game_shaders::shaders::depth_only_frag)) :
+        create_shader(load_spv(gev_game_shaders::shaders::shader2_frag));
 
       vk::SpecializationMapEntry pass_id(0, 0, sizeof(int));
       vk::SpecializationMapEntry const entries[] = {pass_id};
@@ -119,6 +107,8 @@ namespace gev::game
 
       if (pass == pass_id::forward)
         builder.color_attachment(gev::engine::get().swapchain_format().surfaceFormat.format);
+      else if (pass == pass_id::shadow)
+        builder.color_attachment(vk::Format::eR32G32Sfloat);
       return builder.build();
     }
 
@@ -134,5 +124,17 @@ namespace gev::game
   std::shared_ptr<shader> shader::make_skinned()
   {
     return std::make_shared<default_shader>(true);
+  }
+
+  shader_repo::shader_repo()
+  {
+    emplace(shaders::standard, gev::game::shader::make_default());
+    emplace(shaders::skinned, gev::game::shader::make_skinned());
+  }
+
+  void shader_repo::invalidate_all() const
+  {
+    for (auto const& [id, sh] : _resources)
+      sh->invalidate();
   }
 }    // namespace gev::game

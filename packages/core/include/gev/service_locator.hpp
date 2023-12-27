@@ -9,6 +9,13 @@ namespace gev
   class service_locator
   {
   public:
+    template<typename T>
+    std::shared_ptr<T> register_existing_service(std::shared_ptr<T> svc)
+    {
+      _services[typeid(T).hash_code()] = std::static_pointer_cast<void>(svc);
+      return svc;
+    }
+
     template<typename T, typename... Args>
     std::shared_ptr<T> register_service(Args&&... args)
     {
@@ -32,6 +39,14 @@ namespace gev
       if (iter == _services.end())
         return nullptr;
       return std::static_pointer_cast<I>(iter->second);
+    }
+
+    template<typename I>
+    void erase()
+    {
+      auto const iter = _services.find(typeid(I).hash_code());
+      if (iter != _services.end())
+        _services.erase(iter);
     }
 
     void clear()

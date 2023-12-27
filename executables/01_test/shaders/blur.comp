@@ -1,0 +1,35 @@
+#version 460 core
+
+layout(constant_id = 0) const int dir = 0;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D in_texture;
+layout(set = 0, binding = 1) uniform writeonly image2D out_texture;
+
+const float kernel[] = {0.19859610213125314, 0.17571363439579307, 0.12170274650962626, 0.06598396774984912, 0.028001560233780885, 0.009300040045324049};
+
+void main()
+{
+  uvec2 max_size = uvec2(textureSize(in_texture, 0));
+  uvec2 gid = gl_GlobalInvocationID.xy;
+
+  if(gid.x >= max_size.x || gid.y >= max_size.y)
+    return;
+    
+  vec2 max_sizef = vec2(max_size);
+  ivec2 pixel = ivec2(gid);
+  vec2 pixelf = vec2(pixel) / max_sizef;
+  vec2 offset = vec2(0, 0);
+  offset[dir] = 1;
+  offset /= max_sizef;
+
+  vec4 center = kernel[0] * texture(in_texture, pixelf);
+
+  for(int i=1; i < kernel.length(); ++i)
+  {
+    center += kernel[i] * texture(in_texture, pixelf + i * offset);
+    center += kernel[i] * texture(in_texture, pixelf - i * offset);
+  }
+
+  imageStore(out_texture, pixel, center);
+}

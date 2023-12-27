@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <gev/scenery/component.hpp>
 #include <gev/scenery/entity.hpp>
+#include <print>
 
 namespace gev::scenery
 {
@@ -50,6 +51,27 @@ namespace gev::scenery
           e->activate();
       }
     }
+  }
+
+  void entity::erase(std::shared_ptr<component> comp)
+  {
+    auto const found = std::find(begin(_components), end(_components), comp);
+
+    if (found != end(_components))
+    {
+      found->get()->despawn();
+      _components.erase(found);
+    }
+  }
+
+  void entity::despawn() const
+  {
+    deactivate();
+    for (auto const& c : _components)
+      c->despawn();
+
+    for (auto& e : _children)
+      e->despawn();
   }
 
   void entity::deactivate() const
@@ -129,6 +151,20 @@ namespace gev::scenery
       c->update();
   }
 
+  void entity::collides(
+    std::shared_ptr<entity> other, float distance, rnu::vec3 point_on_self, rnu::vec3 point_on_other) const
+  {
+    if (!_active)
+      return;
+
+    for (auto const& c : _components)
+      if (c->_active)
+        c->collides(other, distance, point_on_self, point_on_other);
+
+    for (auto const& c : _children)
+      c->collides(other, distance, point_on_self, point_on_other);
+  }
+
   void entity::fixed_update(double time, double delta) const
   {
     if (!_active)
@@ -178,5 +214,10 @@ namespace gev::scenery
   std::shared_ptr<entity> entity::parent() const
   {
     return _parent.lock();
+  }
+
+  std::shared_ptr<entity_manager> entity::manager() const
+  {
+    return _manager.lock();
   }
 }    // namespace gev::scenery

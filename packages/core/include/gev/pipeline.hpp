@@ -12,7 +12,7 @@ namespace gev
     vk::ArrayProxy<vk::PushConstantRange> push_constant_ranges = {});
 
   vk::UniquePipeline build_compute_pipeline(
-    vk::PipelineLayout layout, vk::ShaderModule module, char const* entry = "main");
+    vk::PipelineLayout layout, vk::ShaderModule module, char const* entry = "main", vk::SpecializationInfo* spec = nullptr);
 
   class simple_pipeline_builder
   {

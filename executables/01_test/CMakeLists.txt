@@ -8,7 +8,15 @@ add_executable(01_test
   "components/camera_component.cpp"
   "components/camera_controller.cpp"
   "components/renderer_component.cpp"
-  ${WIN32_RESOURCES}    "components/shadow_map_component.cpp" "components/bone_component.cpp" "components/skin_component.cpp")
+  ${WIN32_RESOURCES}    
+  "components/shadow_map_component.cpp"
+  "components/bone_component.cpp"
+  "components/skin_component.cpp"
+  "blur.cpp"
+  "components/sound_component.cpp"
+  "environment_shader.cpp"
+  "gltf_loader.cpp"
+  "components/debug_ui_component.cpp" "components/ground_component.cpp")
 target_link_libraries(01_test PRIVATE gev.core gev.scenery gev.imgui gev.audio gev.game)
 add_custom_command(TARGET 01_test POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:01_test> $<TARGET_FILE_DIR:01_test>
@@ -28,6 +36,7 @@ compile_shaders(
   "shaders/draw_ddf.frag"
   "shaders/grass.vert"
   "shaders/grass.frag"
+  "shaders/blur.comp"
 )
 target_link_libraries(01_test PRIVATE test_shaders rnu::rnu)
 

@@ -13,19 +13,15 @@ namespace gev::game
   {
     int mip_levels = gev::mip_levels_for(width, height, 1);
 
-    _texture = std::make_unique<gev::image>(
-      vk::ImageCreateInfo()
-        .setFormat(vk::Format::eR8G8B8A8Unorm)
-        .setArrayLayers(1)
-        .setExtent({std::uint32_t(width), std::uint32_t(height), 1})
-        .setImageType(vk::ImageType::e2D)
-        .setInitialLayout(vk::ImageLayout::eUndefined)
-        .setMipLevels(mip_levels)
-        .setSamples(vk::SampleCountFlagBits::e1)
-        .setTiling(vk::ImageTiling::eOptimal)
-        .setSharingMode(vk::SharingMode::eExclusive)
-        .setUsage(vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst |
-          vk::ImageUsageFlagBits::eTransferSrc));
+    _texture =
+      gev::image_creator::get()
+        .format(vk::Format::eR8G8B8A8Unorm)
+        .size(width, height)
+        .type(vk::ImageType::e2D)
+        .levels(mip_levels)
+        .usage(vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst |
+          vk::ImageUsageFlagBits::eTransferSrc)
+        .build();
     _texture_view = _texture->create_view(vk::ImageViewType::e2D);
 
     auto const staging_buffer = gev::buffer::host_local(width * height * 4, vk::BufferUsageFlagBits::eTransferSrc);
@@ -71,19 +67,15 @@ namespace gev::game
       stbi_load(image.string().c_str(), &width, &height, &comp, 4), &free);
     int mip_levels = gev::mip_levels_for(width, height, 1);
 
-    _texture = std::make_unique<gev::image>(
-      vk::ImageCreateInfo()
-        .setFormat(vk::Format::eR8G8B8A8Unorm)
-        .setArrayLayers(1)
-        .setExtent({std::uint32_t(width), std::uint32_t(height), 1})
-        .setImageType(vk::ImageType::e2D)
-        .setInitialLayout(vk::ImageLayout::eUndefined)
-        .setMipLevels(mip_levels)
-        .setSamples(vk::SampleCountFlagBits::e1)
-        .setTiling(vk::ImageTiling::eOptimal)
-        .setSharingMode(vk::SharingMode::eExclusive)
-        .setUsage(vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst |
-          vk::ImageUsageFlagBits::eTransferSrc));
+    _texture =
+      gev::image_creator::get()
+        .format(vk::Format::eR8G8B8A8Unorm)
+        .size(width, height)
+        .type(vk::ImageType::e2D)
+        .levels(mip_levels)
+        .usage(vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst |
+          vk::ImageUsageFlagBits::eTransferSrc)
+        .build();
     _texture_view = _texture->create_view(vk::ImageViewType::e2D);
 
     auto const staging_buffer = gev::buffer::host_local(width * height * 4, vk::BufferUsageFlagBits::eTransferSrc);
@@ -139,20 +131,17 @@ namespace gev::game
     }
     int mip_levels = gev::mip_levels_for(width, height, 1);
 
-    _texture = std::make_unique<gev::image>(
-      vk::ImageCreateInfo()
-        .setFormat(vk::Format::eR8G8B8A8Unorm)
-        .setArrayLayers(6)
-        .setFlags(vk::ImageCreateFlagBits::eCubeCompatible)
-        .setExtent({std::uint32_t(width), std::uint32_t(height), 1})
-        .setImageType(vk::ImageType::e2D)
-        .setInitialLayout(vk::ImageLayout::eUndefined)
-        .setMipLevels(mip_levels)
-        .setSamples(vk::SampleCountFlagBits::e1)
-        .setTiling(vk::ImageTiling::eOptimal)
-        .setSharingMode(vk::SharingMode::eExclusive)
-        .setUsage(vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst |
-          vk::ImageUsageFlagBits::eTransferSrc));
+    _texture =
+      gev::image_creator::get()
+        .flags(vk::ImageCreateFlagBits::eCubeCompatible)
+        .format(vk::Format::eR8G8B8A8Unorm)
+        .layers(6)
+        .size(width, height)
+        .type(vk::ImageType::e2D)
+        .levels(mip_levels)
+        .usage(vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst |
+          vk::ImageUsageFlagBits::eTransferSrc)
+        .build();
     _texture_view = _texture->create_view(vk::ImageViewType::eCube);
 
     gev::buffer staging_buffer(VMA_MEMORY_USAGE_AUTO_PREFER_HOST,

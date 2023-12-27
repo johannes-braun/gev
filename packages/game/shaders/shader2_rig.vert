@@ -11,6 +11,8 @@ layout(set = 0, binding = 0) uniform Camera
 {
   mat4 view_matrix;
   mat4 proj_matrix;
+  mat4 inverse_view_matrix;
+  mat4 inverse_proj_matrix;
 } camera;
 
 struct entity_info

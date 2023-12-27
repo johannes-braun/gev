@@ -351,8 +351,10 @@ namespace gev::scenery
     std::string warn;
 
     bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
-    std::cerr << "GLTF [E]: " << err << '\n';
-    std::cerr << "GLTF [W]: " << warn << '\n';
+    if (!err.empty())
+      std::cerr << "GLTF [E]: " << err << '\n';
+    if (!warn.empty())
+      std::cerr << "GLTF [W]: " << warn << '\n';
 
     gltf_load_state state;
 

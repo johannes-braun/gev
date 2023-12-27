@@ -60,11 +60,9 @@ namespace gev::game
     }
   }
 
-  void mesh_renderer::render(std::int32_t x, std::int32_t y, std::uint32_t w, std::uint32_t h, pass_id pass,
-    vk::SampleCountFlagBits samples, frame const& frame)
+  void mesh_renderer::render(vk::CommandBuffer c, std::int32_t x, std::int32_t y, std::uint32_t w, std::uint32_t h,
+    pass_id pass, vk::SampleCountFlagBits samples)
   {
-    auto& c = frame.command_buffer;
-
     for (auto const& [shader, batch] : *_batches)
     {
       shader->bind(c, pass);
@@ -72,19 +70,15 @@ namespace gev::game
       c.setScissor(0, vk::Rect2D({x, y}, {w, h}));
       c.setRasterizationSamplesEXT(samples);
 
-      shader->attach(c, _camera->descriptor(frame.frame_index), camera_set);
+      shader->attach(c, _camera->descriptor(), camera_set);
       shader->attach(c, _shadow_map_holder->descriptor(), shadow_maps_set);
 
       int draw_calls = 0;
       for (auto const& b : batch)
       {
-        b.first->bind(frame.command_buffer, shader->layout(), material_set);
-
-        if (pass == pass_id::shadow)
-          c.setCullMode(vk::CullModeFlagBits::eFront);
-
+        b.first->bind(c, shader->layout(), material_set);
         shader->attach(c, b.second->descriptor(), object_info_set);
-        b.second->render(frame.command_buffer);
+        b.second->render(c);
       }
     }
   }

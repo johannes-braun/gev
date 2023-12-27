@@ -20,7 +20,7 @@ namespace gev
     out << severity_name(s);
   }
 
-  logger::logger() {}
+  logger::logger() : _pool(1) {}
 
   void logger::log_string(severity s, std::string text)
   {

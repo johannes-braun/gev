@@ -37,12 +37,18 @@ namespace gev
     return *this;
   }
 
+  descriptor_layout_creator& descriptor_layout_creator::flags(vk::DescriptorSetLayoutCreateFlags f)
+  {
+    _layout_flags |= f;
+    return *this;
+  }
+
   vk::UniqueDescriptorSetLayout descriptor_layout_creator::build()
   {
     vk::DescriptorSetLayoutBindingFlagsCreateInfo flags_info;
     flags_info.setBindingFlags(_flags);
     return engine::get().device().createDescriptorSetLayoutUnique(
-      vk::DescriptorSetLayoutCreateInfo().setBindings(_bindings).setPNext(&flags_info));
+      vk::DescriptorSetLayoutCreateInfo().setFlags(_layout_flags).setBindings(_bindings).setPNext(&flags_info));
   }
 
   void update_descriptor(vk::DescriptorSet set, std::uint32_t binding, gev::buffer const& buf, vk::DescriptorType type)
