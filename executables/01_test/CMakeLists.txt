@@ -6,7 +6,7 @@ endif()
 add_executable(01_test 
   "01_test.cpp" 
   "components/camera_component.cpp"
-  "components/camera_controller.cpp"
+  "components/camera_controller_component.cpp"
   "components/renderer_component.cpp"
   ${WIN32_RESOURCES}    
   "components/shadow_map_component.cpp"
@@ -15,7 +15,7 @@ add_executable(01_test
   "components/sound_component.cpp"
   "environment_shader.cpp"
   "gltf_loader.cpp"
-  "components/debug_ui_component.cpp" "components/ground_component.cpp")
+  "components/debug_ui_component.cpp" "components/ground_component.cpp" "components/remote_controller_component.cpp")
 target_link_libraries(01_test PRIVATE gev.core gev.scenery gev.imgui gev.audio gev.game)
 add_custom_command(TARGET 01_test POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:01_test> $<TARGET_FILE_DIR:01_test>

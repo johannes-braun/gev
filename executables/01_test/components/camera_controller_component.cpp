@@ -1,6 +1,6 @@
-#include "camera_controller.hpp"
+#include "camera_controller_component.hpp"
 
-void camera_controller::spawn()
+void camera_controller_component::spawn()
 {
   _camera = owner()->get<camera_component>();
   if (auto c = _camera.lock())
@@ -10,7 +10,7 @@ void camera_controller::spawn()
   }
 }
 
-void camera_controller::early_update()
+void camera_controller_component::early_update()
 {
   _base_camera.set_position(owner()->global_transform().position);
   _base_camera.replace_rotation(owner()->global_transform().rotation);

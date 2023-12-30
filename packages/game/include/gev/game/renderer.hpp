@@ -5,6 +5,7 @@
 #include <gev/per_frame.hpp>
 #include <vulkan/vulkan.hpp>
 #include <rnu/math/math.hpp>
+#include <gev/game/render_target_2d.hpp>
 
 namespace gev::game
 {
@@ -16,6 +17,8 @@ namespace gev::game
     void set_color_format(vk::Format fmt); 
     void set_depth_format(vk::Format fmt); 
     void set_clear_color(rnu::vec4 color);
+    vk::Format get_color_format() const;
+    vk::Format get_depth_format() const;
 
     void set_render_size(vk::Extent2D size);
     void set_samples(vk::SampleCountFlagBits samples);
@@ -25,10 +28,18 @@ namespace gev::game
     void bind_pipeline(vk::CommandBuffer c, vk::Pipeline pipeline, vk::PipelineLayout layout);
     void end_render(vk::CommandBuffer c);
 
-    std::shared_ptr<gev::image> color_image();
-    std::shared_ptr<gev::image> depth_image();
-    vk::ImageView color_image_view();
-    vk::ImageView depth_image_view();
+    void resolve(vk::CommandBuffer c);
+
+    //std::shared_ptr<gev::image> resolve_image();
+    //vk::ImageView resolve_image_view();
+    //std::shared_ptr<gev::image> color_image();
+    //std::shared_ptr<gev::image> depth_image();
+    //vk::ImageView color_image_view();
+    //vk::ImageView depth_image_view();
+    render_target_2d const& color_target();
+    render_target_2d const& depth_target();
+    render_target_2d const& resolve_target();
+
     void set_color_usage(vk::ImageUsageFlags flags);
     void add_color_usage(vk::ImageUsageFlags flags);
 
@@ -36,13 +47,9 @@ namespace gev::game
     void rebuild_attachments();
     void force_build_attachments();
 
-    struct render_attachment
-    {
-      std::shared_ptr<gev::image> image;
-      vk::UniqueImageView view;
-    };
-    render_attachment _color_target;
-    render_attachment _depth_target;
+    std::unique_ptr<render_target_2d> _color_target;
+    std::unique_ptr<render_target_2d> _depth_target;
+    std::unique_ptr<render_target_2d> _resolve_target;
 
     vk::Format _color_format;
     vk::Format _depth_format;

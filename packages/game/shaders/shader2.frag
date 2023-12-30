@@ -70,7 +70,7 @@ vec3 tonemapFilmic(vec3 x) {
   return pow(result, vec3(gamma));
 }
 
-#define tonemap tonemapFilmic
+#define tonemap
 
 const mat4 biasMat = mat4( 
 	0.5, 0.0, 0.0, 0.0,
@@ -91,8 +91,6 @@ float shadow_vsm(int id, vec4 shadowCoord, int fac)
 	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0) 
 	{
 		vec2 moments = texture(shadow_maps[nonuniformEXT(id)], shadowCoord.st).xy;
-
-//    return 1-step(moments.x, shadowCoord.z - 0.002 / fac);
 
     float p = step(shadowCoord.z, moments.x);
     float var = max(moments.y - moments.x * moments.x, 2e-5 / pow(10, fac));
@@ -125,7 +123,7 @@ float shadow_map_sample(int index, out vec3 ld, out vec2 uv, int fac)
 }
 
 const vec3 ambient = 0.4 * vec3(0.24, 0.21, 0.35);
-const vec3 light_color = vec3(1, 0.98, 0.96);
+const vec3 light_color = 1.5 * vec3(1, 0.98, 0.96);
 
 void main()
 {

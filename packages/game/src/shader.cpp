@@ -4,6 +4,7 @@
 #include <gev/pipeline.hpp>
 #include <gev_game_shaders_files.hpp>
 #include <rnu/math/math.hpp>
+#include <gev/game/formats.hpp>
 
 namespace gev::game
 {
@@ -106,9 +107,9 @@ namespace gev::game
             vk::DynamicState::eVertexInputEXT});
 
       if (pass == pass_id::forward)
-        builder.color_attachment(gev::engine::get().swapchain_format().surfaceFormat.format);
+        builder.color_attachment(formats::forward_pass);
       else if (pass == pass_id::shadow)
-        builder.color_attachment(vk::Format::eR32G32Sfloat);
+        builder.color_attachment(formats::shadow_pass);
       return builder.build();
     }
 

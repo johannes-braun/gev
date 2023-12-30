@@ -1,4 +1,5 @@
 #include <gev/game/cascaded_shadow_mapping.hpp>
+#include <gev/game/formats.hpp>
 
 namespace gev::game
 {
@@ -98,17 +99,9 @@ namespace gev::game
       c.renderer->set_clear_color({1.0f, 1.0f, 0.0f, 0.0f});
     }
 
-    _blur_dst =
-      gev::image_creator::get()
-        .size(_size.width, _size.height)
-        .format(vk::Format::eR32G32Sfloat)
-        .type(vk::ImageType::e2D)
-        .usage(
-          vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferSrc)
-        .build();
-    _blur_dst_view = _blur_dst->create_view(vk::ImageViewType::e2D);
-    _blur1 = std::make_unique<blur>(blur_dir::vertical);
-    _blur2 = std::make_unique<blur>(blur_dir::horizontal);
+    _blur_tmp = std::make_unique<render_target_2d>(_size, formats::shadow_pass,
+      vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferSrc);
+    _blur = std::make_unique<blur>();
   }
 
   void cascaded_shadow_mapping::enable()
@@ -118,8 +111,8 @@ namespace gev::game
       if (!c.instance)
       {
         auto const r = gev::service<gev::game::mesh_renderer>();
-        auto img = c.renderer->color_image();
-        auto view = c.renderer->color_image_view();
+        auto img = c.renderer->color_target().image();
+        auto view = c.renderer->color_target().view();
 
         c.instance = r->get_shadow_map_holder()->instantiate(img, c.camera->projection_matrix() * c.camera->view());
       }
@@ -185,18 +178,17 @@ namespace gev::game
     {
       r.set_camera(c.camera);
 
-      auto src = c.renderer->color_image();
-      auto src_view = c.renderer->color_image_view();
+      auto& src = c.renderer->color_target();
 
       c.renderer->prepare_frame(cmd);
       c.renderer->begin_render(cmd);
       r.render(cmd, 0, 0, _size.width, _size.height, gev::game::pass_id::shadow, vk::SampleCountFlagBits::e1);
       c.renderer->end_render(cmd);
 
-      _blur1->apply(cmd, 1.2f / (num + 1), *src, src_view, *_blur_dst, _blur_dst_view.get());
-      _blur2->apply(cmd, 1.2f / (num + 1), *_blur_dst, _blur_dst_view.get(), *src, src_view);
+      _blur->apply(cmd, gev::game::blur_dir::horizontal, 1.2f / (num + 1), src, *_blur_tmp);
+      _blur->apply(cmd, gev::game::blur_dir::vertical, 1.2f / (num + 1), *_blur_tmp, src);
 
-      src->layout(cmd, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eFragmentShader,
+      src.image()->layout(cmd, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eFragmentShader,
         vk::AccessFlagBits2::eShaderSampledRead);
 
       ++num;

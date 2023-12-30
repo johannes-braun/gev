@@ -1,9 +1,10 @@
 #include "collision_masks.hpp"
 #include "components/bone_component.hpp"
 #include "components/camera_component.hpp"
-#include "components/camera_controller.hpp"
+#include "components/camera_controller_component.hpp"
 #include "components/debug_ui_component.hpp"
 #include "components/ground_component.hpp"
+#include "components/remote_controller_component.hpp"
 #include "components/renderer_component.hpp"
 #include "components/shadow_map_component.hpp"
 #include "components/skin_component.hpp"
@@ -18,9 +19,14 @@
 #include <gev/buffer.hpp>
 #include <gev/descriptors.hpp>
 #include <gev/engine.hpp>
+#include <gev/game/addition.hpp>
+#include <gev/game/blur.hpp>
 #include <gev/game/camera.hpp>
+#include <gev/game/cutoff.hpp>
+#include <gev/game/formats.hpp>
 #include <gev/game/layouts.hpp>
 #include <gev/game/mesh_renderer.hpp>
+#include <gev/game/render_target_2d.hpp>
 #include <gev/game/renderer.hpp>
 #include <gev/imgui/imgui.h>
 #include <gev/imgui/imgui_extra.hpp>
@@ -44,13 +50,21 @@ public:
   test01()
   {
     gev::engine::get().start("Test 01", 1280, 720);
-
     gev::register_service<gev::game::renderer>(gev::engine::get().swapchain_size(), _render_samples);
     gev::register_service<gev::game::mesh_renderer>();
     gev::register_service<gev::game::shader_repo>();
 
-    gev::engine::get().on_resized([](int w, int h)
-      { gev::service<gev::game::renderer>()->set_render_size(vk::Extent2D(std::uint32_t(w), std::uint32_t(h))); });
+    fill_img(_img[0], gev::engine::get().swapchain_size());
+    fill_img(_img[1], gev::engine::get().swapchain_size());
+    early_init();
+
+    gev::engine::get().on_resized(
+      [this](int w, int h)
+      {
+        gev::service<gev::game::renderer>()->set_render_size(vk::Extent2D(std::uint32_t(w), std::uint32_t(h)));
+        fill_img(_img[0], {std::uint32_t(w), std::uint32_t(h)});
+        fill_img(_img[1], {std::uint32_t(w), std::uint32_t(h)});
+      });
   }
 
   void draw_component_tree(std::span<std::shared_ptr<gev::scenery::entity> const> entities)
@@ -95,10 +109,8 @@ public:
     auto audio_host = gev::service<gev::audio::audio_host>();
     auto audio_repo = gev::service<gev::audio_repo>();
     shader_repo->emplace("ENVIRONMENT", std::make_shared<environment_shader>());
-    
-    audio_repo->emplace("sound.ogg", audio_host->load_file("res/sound.ogg"));
 
-    auto const default_shader = shader_repo->get(gev::game::shaders::standard);
+    audio_repo->emplace("sound.ogg", audio_host->load_file("res/sound.ogg"));
 
     // ################################################
     auto const player = entity_manager->instantiate(entities::player_entity);
@@ -110,6 +122,7 @@ public:
     ptcl->local_transform.position.y = -0.5;
     player->local_transform.position.y = 0.5;
     player->emplace<debug_ui_component>("Player");
+    player->emplace<remote_controller_component>()->own();
     // ################################################
 
     auto e = entity_manager->instantiate();
@@ -119,16 +132,14 @@ public:
     auto e2 = entity_manager->instantiate(entities::player_camera);
     e2->emplace<debug_ui_component>("Camera");
     e2->emplace<camera_component>();
-    e2->emplace<camera_controller>();
+    e2->emplace<camera_controller_component>();
     e2->emplace<sound_component>();
     e2->local_transform.position = rnu::vec3(4, 2, 5);
     e2->local_transform.rotation = rnu::look_at(e2->local_transform.position, rnu::vec3(0, 0, 0), rnu::vec3(0, 1, 0));
 
     auto ch03 = entity_manager->instantiate(e);
     ch03->emplace<debug_ui_component>("Ground Map");
-    auto rc03 = ch03->emplace<renderer_component>();
-    rc03->set_renderer(mesh_renderer);
-    rc03->set_shader(default_shader);
+    ch03->emplace<renderer_component>();
     ch03->emplace<ground_component>();
     auto ground = std::make_shared<btStaticPlaneShape>(btVector3{0, 1, 0}, 0.f);
     ch03->emplace<gev::scenery::collider_component>(
@@ -137,8 +148,6 @@ public:
     auto ch04 = entity_manager->instantiate(e);
     ch04->emplace<debug_ui_component>("Object");
     auto rc04 = ch04->emplace<renderer_component>();
-    rc04->set_renderer(mesh_renderer);
-    rc04->set_shader(default_shader);
     rc04->set_mesh(std::make_shared<gev::game::mesh>("res/torus.obj"));
     rc04->set_material(std::make_shared<gev::game::material>());
 
@@ -147,8 +156,6 @@ public:
       collider->local_transform.position = {5, 0, 3};
       collider->emplace<debug_ui_component>("Collider Sphere");
       auto sphere_rnd = collider->emplace<renderer_component>();
-      sphere_rnd->set_renderer(mesh_renderer);
-      sphere_rnd->set_shader(default_shader);
       sphere_rnd->set_mesh(std::make_shared<gev::game::mesh>("res/sphere.obj"));
       auto const sphere_mat = std::make_shared<gev::game::material>();
       sphere_mat->set_diffuse({0.2f, 0.4f, 0.7f, 1.0f});
@@ -284,7 +291,7 @@ private:
     // PREPARE AND UPDATE SCENE
     renderer->prepare_frame(frame.command_buffer);
     mesh_renderer->try_flush(frame.command_buffer);
-    
+
     // ENVIRONMENT
     renderer->begin_render(frame.command_buffer, false);
     auto const env = shader_repo->get("ENVIRONMENT");
@@ -307,7 +314,19 @@ private:
       frame.command_buffer, 0, 0, size.width, size.height, gev::game::pass_id::forward, _render_samples);
     renderer->end_render(frame.command_buffer);
 
-    frame.present_image(*renderer->color_image());
+    renderer->resolve(frame.command_buffer);
+
+    // BLOOM because why not
+    auto& s = renderer->resolve_target();
+    auto& a = *_img[0];
+    auto& b = *_img[1];
+
+    _cutoff->apply(frame.command_buffer, 1.0f, s, b);
+    _blur->apply(frame.command_buffer, gev::game::blur_dir::horizontal, 3.2f, b, a);
+    _blur->apply(frame.command_buffer, gev::game::blur_dir::vertical, 3.2f, a, b);
+    _addition->apply(frame.command_buffer, 0.53f, s, b, a);
+
+    frame.present_image(*a.image());
     return true;
   }
 
@@ -321,6 +340,25 @@ private:
   bool _fullscreen = false;
   rnu::vec2i _position_before_fullscreen = {0, 0};
   rnu::vec2i _size_before_fullscreen = {0, 0};
+
+  std::unique_ptr<gev::game::render_target_2d> _img[2];
+
+  std::unique_ptr<gev::game::cutoff> _cutoff;
+  std::unique_ptr<gev::game::blur> _blur;
+  std::unique_ptr<gev::game::addition> _addition;
+
+  void early_init()
+  {
+    _cutoff = std::make_unique<gev::game::cutoff>();
+    _blur = std::make_unique<gev::game::blur>();
+    _addition = std::make_unique<gev::game::addition>();
+  }
+
+  void fill_img(std::unique_ptr<gev::game::render_target_2d>& i, vk::Extent2D size)
+  {
+    i = std::make_unique<gev::game::render_target_2d>(size, gev::game::formats::forward_pass,
+      vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled);
+  }
 };
 
 int main(int argc, char** argv)

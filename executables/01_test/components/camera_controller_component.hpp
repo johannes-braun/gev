@@ -6,7 +6,7 @@
 #include <rnu/algorithm/smooth.hpp>
 #include <rnu/camera.hpp>
 
-class camera_controller : public gev::scenery::component
+class camera_controller_component : public gev::scenery::component
 {
 public:
   void spawn() override;

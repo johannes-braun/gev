@@ -49,8 +49,11 @@ void skin_component::early_update()
 
 void skin_component::set_animation(std::string name)
 {
-  _current_animation = std::move(name);
-  _running = false;
+  if (_current_animation != name)
+  {
+    _current_animation = std::move(name);
+    _running = false;
+  }
 }
 
 std::unordered_map<std::string, gev::scenery::joint_animation> const& skin_component::animations() const

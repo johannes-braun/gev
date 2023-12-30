@@ -1,0 +1,31 @@
+#version 460 core
+
+layout(constant_id = 0) const int dir = 0;
+layout(local_size_x_id = 1, local_size_y_id = 2) in;
+
+layout(set = 0, binding = 0) uniform sampler2D in_texture1;
+layout(set = 0, binding = 1) uniform sampler2D in_texture2;
+layout(set = 0, binding = 2) uniform writeonly image2D out_texture;
+
+layout( push_constant ) uniform Constants
+{
+  float factor;
+} options;
+
+void main()
+{
+  uvec2 max_size = uvec2(textureSize(in_texture1, 0));
+  uvec2 gid = gl_GlobalInvocationID.xy;
+
+  if(gid.x >= max_size.x || gid.y >= max_size.y)
+    return;
+    
+  vec2 max_sizef = vec2(max_size);
+  ivec2 pixel = ivec2(gid);
+  vec2 pixelf = vec2(pixel) / max_sizef;
+
+  vec4 color1 = texture(in_texture1, pixelf);
+  vec4 color2 = texture(in_texture2, pixelf);
+  vec4 result = color1 + options.factor * color2;
+  imageStore(out_texture, pixel, result);
+}

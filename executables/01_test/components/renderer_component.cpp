@@ -1,5 +1,13 @@
 #include "renderer_component.hpp"
 
+void renderer_component::spawn()
+{
+  if (_renderer.expired())
+    _renderer = gev::service<gev::game::mesh_renderer>();
+  if (!_shader)
+    _shader = gev::service<gev::game::shader_repo>()->get(gev::game::shaders::standard);
+}
+
 void renderer_component::update()
 {
   if (_mesh_instance)

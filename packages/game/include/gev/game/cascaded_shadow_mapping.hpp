@@ -28,10 +28,8 @@ namespace gev::game
 
     vk::Extent2D _size;
     std::vector<cascade> _cascades;
-    std::unique_ptr<blur> _blur1;
-    std::unique_ptr<blur> _blur2;
-    std::unique_ptr<gev::image> _blur_dst;
-    vk::UniqueImageView _blur_dst_view;
+    std::unique_ptr<blur> _blur;
+    std::unique_ptr<render_target_2d> _blur_tmp;
     float _split_lambda;
   };
 }    // namespace gev::game

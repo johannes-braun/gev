@@ -6,6 +6,7 @@ void ground_component::spawn()
   _mesh = std::make_shared<gev::game::mesh>(_tri);
   _renderer->set_material(std::make_shared<gev::game::material>());
   _renderer->get_material()->set_roughness(0.6);
+  _renderer->get_material()->set_diffuse(_color);
 
   _tri.indices.clear();
   _tri.positions.clear();

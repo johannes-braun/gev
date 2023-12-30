@@ -9,6 +9,7 @@
 class renderer_component : public gev::scenery::component
 {
 public:
+  void spawn() override;
   void update() override;
   void activate() override;
   void deactivate() override;

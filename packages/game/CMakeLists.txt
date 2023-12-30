@@ -8,6 +8,7 @@ target_link_libraries(${GEV_CURRENT_LIBRARY} PUBLIC gev.core gev.audio gev.scene
 target_sources(${GEV_CURRENT_LIBRARY} PRIVATE
   "src/renderer.cpp"
   "src/blur.cpp"
+  "src/cutoff.cpp"
   "src/mesh.cpp"
   "src/mesh_renderer.cpp"
   "src/texture.cpp"
@@ -21,7 +22,7 @@ target_sources(${GEV_CURRENT_LIBRARY} PRIVATE
   "src/shadow_map_holder.cpp"
   "src/shader.cpp"
   "src/sync_buffer.cpp"
-  "src/cascaded_shadow_mapping.cpp")
+  "src/cascaded_shadow_mapping.cpp" "src/addition.cpp" "src/render_target_2d.cpp")
 
 compile_shaders(gev_game_shaders
   "shaders/generate_distance_field.comp"
@@ -29,5 +30,7 @@ compile_shaders(gev_game_shaders
   "shaders/shader2.frag"
   "shaders/shader2.vert"
   "shaders/shader2_rig.vert"
-  "shaders/blur.comp")
+  "shaders/blur.comp"
+  "shaders/cutoff.comp"
+  "shaders/addition.comp")
 target_link_libraries(gev.game PUBLIC gev_game_shaders)

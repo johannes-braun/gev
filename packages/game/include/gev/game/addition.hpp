@@ -5,17 +5,12 @@
 
 namespace gev::game
 {
-  enum class blur_dir : int
-  {
-    horizontal = 0,
-    vertical = 1
-  };
-
-  class blur
+  class addition
   {
   public:
-    blur();
-    void apply(vk::CommandBuffer c, blur_dir dir, float step_size, render_target_2d const& src, render_target_2d const& dst);
+    addition();
+    void apply(vk::CommandBuffer c, float factor, render_target_2d const& src1, render_target_2d const& src2,
+      render_target_2d const& dst);
 
   private:
     vk::UniquePipeline _pipeline;
