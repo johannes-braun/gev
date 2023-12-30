@@ -7,6 +7,7 @@ target_compile_definitions(${GEV_CURRENT_LIBRARY} PRIVATE GLFW_INCLUDE_NONE)
 target_link_libraries(${GEV_CURRENT_LIBRARY} PUBLIC gev.core gev.audio gev.scenery gev.imgui)
 target_sources(${GEV_CURRENT_LIBRARY} PRIVATE
   "src/renderer.cpp"
+  "src/blur.cpp"
   "src/mesh.cpp"
   "src/mesh_renderer.cpp"
   "src/texture.cpp"
@@ -17,12 +18,16 @@ target_sources(${GEV_CURRENT_LIBRARY} PRIVATE
   "src/layouts.cpp"
   "src/distance_field_holder.cpp"
   "src/mesh_batch.cpp"
-  "src/shadow_map_holder.cpp" "src/shader.cpp")
+  "src/shadow_map_holder.cpp"
+  "src/shader.cpp"
+  "src/sync_buffer.cpp"
+  "src/cascaded_shadow_mapping.cpp")
 
 compile_shaders(gev_game_shaders
   "shaders/generate_distance_field.comp"
   "shaders/depth_only.frag"
   "shaders/shader2.frag"
   "shaders/shader2.vert"
-  "shaders/shader2_rig.vert")
+  "shaders/shader2_rig.vert"
+  "shaders/blur.comp")
 target_link_libraries(gev.game PUBLIC gev_game_shaders)

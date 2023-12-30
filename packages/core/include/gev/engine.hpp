@@ -79,6 +79,9 @@ namespace gev
     int run(std::function<bool(frame const& f)> runnable);
     void on_resized(std::function<void(int w, int h)> callback);
     std::uint32_t num_images() const noexcept;
+    std::span<vk::PresentModeKHR const> present_modes() const noexcept;
+    vk::PresentModeKHR present_mode() const noexcept;
+    void set_present_mode(vk::PresentModeKHR mode);
 
     descriptor_allocator& get_descriptor_allocator();
     descriptor_allocator const& get_descriptor_allocator() const;
@@ -145,11 +148,21 @@ namespace gev
     std::vector<per_swapchain_image> _per_swapchain_image;
     std::vector<std::function<void(int w, int h)>> _resize_callbacks;
 
+    std::vector<vk::PresentModeKHR> _present_modes;
+    vk::PresentModeKHR _present_mode;
+
     vk::UniqueDescriptorPool _imgui_descriptor_pool;
     service_locator _services;
 
+    bool _swapchain_dirty = true;
+
     ImGuiContext* _imgui_context = nullptr;
   };
+
+  static inline vk::Device device()
+  {
+    return engine::get().device();
+  }
 
   template<typename Svc, typename... Args>
   std::shared_ptr<Svc> register_service(Args&&... args)

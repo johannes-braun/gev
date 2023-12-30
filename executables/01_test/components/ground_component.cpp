@@ -12,8 +12,8 @@ void ground_component::spawn()
   _tri.normals.clear();
   _tri.texcoords.clear();
 
-  auto w = 128;
-  auto h = 128;
+  auto w = 64;
+  auto h = 64;
   auto c = 0;
   std::vector<float> hs(w * h);
 

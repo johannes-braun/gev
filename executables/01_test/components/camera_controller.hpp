@@ -10,7 +10,7 @@ class camera_controller : public gev::scenery::component
 {
 public:
   void spawn() override;
-  void update() override;
+  void early_update() override;
 
 private:
   std::weak_ptr<camera_component> _camera;

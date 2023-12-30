@@ -1,13 +1,13 @@
+#include "collision_masks.hpp"
 #include "components/bone_component.hpp"
 #include "components/camera_component.hpp"
 #include "components/camera_controller.hpp"
 #include "components/debug_ui_component.hpp"
+#include "components/ground_component.hpp"
 #include "components/renderer_component.hpp"
 #include "components/shadow_map_component.hpp"
 #include "components/skin_component.hpp"
 #include "components/sound_component.hpp"
-#include "components/ground_component.hpp"
-#include "collision_masks.hpp"
 #include "entity_ids.hpp"
 #include "environment_shader.hpp"
 #include "gltf_loader.hpp"
@@ -94,19 +94,17 @@ public:
     auto shader_repo = gev::service<gev::game::shader_repo>();
     auto audio_host = gev::service<gev::audio::audio_host>();
     auto audio_repo = gev::service<gev::audio_repo>();
-
     shader_repo->emplace("ENVIRONMENT", std::make_shared<environment_shader>());
-
+    
     audio_repo->emplace("sound.ogg", audio_host->load_file("res/sound.ogg"));
 
     auto const default_shader = shader_repo->get(gev::game::shaders::standard);
 
     // ################################################
-
     auto const player = entity_manager->instantiate(entities::player_entity);
     auto shape = std::make_shared<btCapsuleShape>(0.25f, 0.5f);
-    player->emplace<gev::scenery::collider_component>(collision_system, 
-      std::move(shape), 10.0f, false, collisions::player, collisions::all ^ collisions::player);
+    player->emplace<gev::scenery::collider_component>(
+      collision_system, std::move(shape), 10.0f, false, collisions::player, collisions::all ^ collisions::player);
     auto const ptcl = load_gltf_entity("res/ptcl/scene.gltf");
     entity_manager->reparent(ptcl, player);
     ptcl->local_transform.position.y = -0.5;
@@ -116,6 +114,15 @@ public:
 
     auto e = entity_manager->instantiate();
     e->emplace<debug_ui_component>("Scene Root");
+
+    auto unnamed = entity_manager->instantiate(e);
+    auto e2 = entity_manager->instantiate(entities::player_camera);
+    e2->emplace<debug_ui_component>("Camera");
+    e2->emplace<camera_component>();
+    e2->emplace<camera_controller>();
+    e2->emplace<sound_component>();
+    e2->local_transform.position = rnu::vec3(4, 2, 5);
+    e2->local_transform.rotation = rnu::look_at(e2->local_transform.position, rnu::vec3(0, 0, 0), rnu::vec3(0, 1, 0));
 
     auto ch03 = entity_manager->instantiate(e);
     ch03->emplace<debug_ui_component>("Ground Map");
@@ -153,26 +160,9 @@ public:
 
     auto sm = entity_manager->instantiate(e);
     sm->emplace<debug_ui_component>("ShadowMap Camera");
-    sm->emplace<camera_component>();
     sm->emplace<shadow_map_component>();
     sm->local_transform.position = {0, 10, 10};
     sm->local_transform.rotation = rnu::quat(rnu::vec3(1, 0, 0), rnu::radians(-20));
-
-    auto sm2 = entity_manager->instantiate(e);
-    sm2->emplace<debug_ui_component>("ShadowMap Camera 2");
-    sm2->emplace<camera_component>();
-    sm2->emplace<shadow_map_component>();
-    sm2->local_transform.position = {0, 14, 10};
-    sm2->local_transform.rotation = rnu::quat(rnu::vec3(1, 0, 0), rnu::radians(-30));
-
-    auto unnamed = entity_manager->instantiate(e);
-    auto e2 = entity_manager->instantiate(entities::player_camera);
-    e2->emplace<debug_ui_component>("Camera");
-    e2->emplace<camera_component>();
-    e2->emplace<camera_controller>();
-    e2->emplace<sound_component>();
-    e2->local_transform.position = rnu::vec3(4, 2, 5);
-    e2->local_transform.rotation = rnu::look_at(e2->local_transform.position, rnu::vec3(0, 0, 0), rnu::vec3(0, 1, 0));
   }
 
   int start()
@@ -233,6 +223,30 @@ private:
         gev::service<gev::game::renderer>()->set_samples(_render_samples);
       }
 
+      auto const pmode = gev::engine::get().present_mode();
+      auto const pmodes = gev::engine::get().present_modes();
+      auto const iter = std::find(pmodes.begin(), pmodes.end(), pmode);
+      int index = int(std::distance(pmodes.begin(), iter));
+      if (ImGui::Combo(
+            "Present Mode", &index,
+            [](void* d, int i) -> char const*
+            {
+              switch (gev::engine::get().present_modes()[i])
+              {
+                case vk::PresentModeKHR::eFifo: return "FiFo";
+                case vk::PresentModeKHR::eFifoRelaxed: return "Relaxed FiFo";
+                case vk::PresentModeKHR::eImmediate: return "Immediate";
+                case vk::PresentModeKHR::eMailbox: return "Mailbox";
+                case vk::PresentModeKHR::eSharedContinuousRefresh: return "Shared Continuous Refresh";
+                case vk::PresentModeKHR::eSharedDemandRefresh: return "Shared Demand Refresh";
+              }
+              return "<unknown>";
+            },
+            nullptr, int(pmodes.size())))
+      {
+        gev::engine::get().set_present_mode(pmodes[index]);
+      }
+
       if (ImGui::Button("Close"))
       {
         ImGui::End();
@@ -244,7 +258,6 @@ private:
       ImGui::EndGroupPanel();
     }
     ImGui::End();
-
 
     if (_selected_entity.lock() && ImGui::Begin("Entity"))
     {
@@ -270,7 +283,8 @@ private:
 
     // PREPARE AND UPDATE SCENE
     renderer->prepare_frame(frame.command_buffer);
-
+    mesh_renderer->try_flush(frame.command_buffer);
+    
     // ENVIRONMENT
     renderer->begin_render(frame.command_buffer, false);
     auto const env = shader_repo->get("ENVIRONMENT");
@@ -287,7 +301,6 @@ private:
     renderer->end_render(frame.command_buffer);
 
     // MESHES FROM render_component
-    mesh_renderer->try_flush(frame.command_buffer);
     renderer->begin_render(frame.command_buffer, true);
     auto const size = gev::engine::get().swapchain_size();
     mesh_renderer->render(

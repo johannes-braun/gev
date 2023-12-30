@@ -12,7 +12,6 @@ add_executable(01_test
   "components/shadow_map_component.cpp"
   "components/bone_component.cpp"
   "components/skin_component.cpp"
-  "blur.cpp"
   "components/sound_component.cpp"
   "environment_shader.cpp"
   "gltf_loader.cpp"
@@ -36,7 +35,6 @@ compile_shaders(
   "shaders/draw_ddf.frag"
   "shaders/grass.vert"
   "shaders/grass.frag"
-  "shaders/blur.comp"
 )
 target_link_libraries(01_test PRIVATE test_shaders rnu::rnu)
 

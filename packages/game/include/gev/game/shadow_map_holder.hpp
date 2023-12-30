@@ -2,6 +2,7 @@
 
 #include <gev/buffer.hpp>
 #include <gev/image.hpp>
+#include <gev/game/sync_buffer.hpp>
 #include <memory>
 #include <rnu/math/math.hpp>
 #include <unordered_map>
@@ -18,14 +19,13 @@ namespace gev::game
     void update_transform(rnu::mat4 const& transform);
     void destroy();
 
+    void make_csm_root(int num_cascades);
+    void set_cascade_split(float depth);
+
   private:
     std::weak_ptr<shadow_map_holder> _holder;
     std::shared_ptr<gev::image> _map;
     std::size_t _byte_offset = 0;
-  };
-
-  enum class map_id : std::size_t
-  {
   };
 
   class shadow_map_holder : public std::enable_shared_from_this<shadow_map_holder>
@@ -47,6 +47,8 @@ namespace gev::game
     void try_flush_buffer(vk::CommandBuffer c);
 
     void update_matrix_internal(std::size_t offset, rnu::mat4 matrix);
+    void make_csm_root_internal(std::size_t offset, int num_cascades);
+    void set_cascade_split_internal(std::size_t offset, float depth);
 
   private:
     void include_update_region(std::size_t begin, std::size_t end);
@@ -56,8 +58,8 @@ namespace gev::game
       rnu::mat4 matrix;
       rnu::mat4 inverse_matrix;
       int map_id;
-      int metadata0;    // TBD
-      int metadata1;    // TBD
+      int num_cascades; // This plus the next N-1
+      float csm_split;    // depth
       int metadata2;    // TBD
     };
 
@@ -75,8 +77,7 @@ namespace gev::game
     std::vector<std::shared_ptr<shadow_map_instance>> _instances;
     std::size_t _update_region_start = std::numeric_limits<std::size_t>::max();
     std::size_t _update_region_end = std::numeric_limits<std::size_t>::lowest();
-    std::unique_ptr<gev::buffer> _instances_buffer;
-    std::unique_ptr<gev::buffer> _staging_buffer;
+    std::unique_ptr<gev::game::sync_buffer> _instances_buffer;
 
     vk::UniqueSampler _sampler;
   };

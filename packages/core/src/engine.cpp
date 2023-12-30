@@ -7,13 +7,13 @@
 #include <GLFW/glfw3.h>
 // clang-format on
 
+#include <gev/audio/audio.hpp>
 #include <gev/engine.hpp>
 #include <gev/imgui/imgui.h>
 #include <gev/imgui/imgui_impl_glfw.h>
 #include <gev/imgui/imgui_impl_vulkan.h>
-#include <gev/audio/audio.hpp>
-#include <gev/scenery/entity_manager.hpp>
 #include <gev/scenery/collider.hpp>
+#include <gev/scenery/entity_manager.hpp>
 #include <print>
 #include <ranges>
 #include <sstream>
@@ -191,13 +191,19 @@ namespace gev
     _queues.transfer_command_pool = _device->createCommandPoolUnique(cpc);
 
     open_window(title, width, height);
+
+    _present_modes = _physical_device.getSurfacePresentModesKHR(*_window_surface);
+    _present_mode = vk::PresentModeKHR::eFifo;
+    if (std::ranges::find(_present_modes, vk::PresentModeKHR::eMailbox) != end(_present_modes))
+      _present_mode = vk::PresentModeKHR::eMailbox;
+
     create_swapchain();
 
-    auto const imgui_pool_size = vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1);
+    auto const imgui_pool_size = vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 128);
     _imgui_descriptor_pool = _device->createDescriptorPoolUnique(
       vk::DescriptorPoolCreateInfo()
         .setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
-        .setMaxSets(1)
+        .setMaxSets(128)
         .setPoolSizes(imgui_pool_size));
     _imgui_context = ImGui::CreateContext();
     ImGui::SetCurrentContext(_imgui_context);
@@ -330,6 +336,7 @@ namespace gev
 
       entity_manager->update();
       entity_manager->late_update();
+
       if (!runnable(_current_frame))
       {
         glfwSetWindowShouldClose(_window.get(), true);
@@ -373,7 +380,8 @@ namespace gev
       glfwPollEvents();
       current_frame = (current_frame + 1) % _per_swapchain_image.size();
 
-      if (present_result == vk::Result::eErrorOutOfDateKHR || present_result == vk::Result::eSuboptimalKHR)
+      if (_swapchain_dirty || present_result == vk::Result::eErrorOutOfDateKHR ||
+        present_result == vk::Result::eSuboptimalKHR)
       {
         create_swapchain();
         continue;
@@ -381,7 +389,7 @@ namespace gev
     }
 
     _device->waitIdle();
-     entity_manager->despawn();
+    entity_manager->despawn();
     return 0;
   }
 
@@ -409,6 +417,25 @@ namespace gev
   std::uint32_t engine::num_images() const noexcept
   {
     return static_cast<std::uint32_t>(_per_swapchain_image.size());
+  }
+
+  std::span<vk::PresentModeKHR const> engine::present_modes() const noexcept
+  {
+    return _present_modes;
+  }
+
+  vk::PresentModeKHR engine::present_mode() const noexcept
+  {
+    return _present_mode;
+  }
+
+  void engine::set_present_mode(vk::PresentModeKHR mode)
+  {
+    if (mode != _present_mode)
+    {
+      _present_mode = mode;
+      _swapchain_dirty = true;
+    }
   }
 
   void engine::on_resized(std::function<void(int w, int h)> callback)
@@ -560,6 +587,7 @@ namespace gev
     ft12.setRuntimeDescriptorArray(true);
     ft12.setDescriptorBindingPartiallyBound(true);
     ft12.setDescriptorBindingVariableDescriptorCount(true);
+    ft12.setShaderSampledImageArrayNonUniformIndexing(true);
     dynamic_vertex_input.pNext = &ft12;
 
     vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT extd3;
@@ -709,16 +737,12 @@ namespace gev
   void engine::create_swapchain()
   {
     _device->waitIdle();
+    _swapchain_dirty = false;
 
     _per_swapchain_image.clear();
 
     vk::PhysicalDeviceSurfaceInfo2KHR query(*_window_surface);
     auto const caps = _physical_device.getSurfaceCapabilities2KHR(query);
-    auto const present_modes = _physical_device.getSurfacePresentModesKHR(query.surface);
-
-    vk::PresentModeKHR present_mode = vk::PresentModeKHR::eFifo;
-    if (std::ranges::find(present_modes, vk::PresentModeKHR::eMailbox) != end(present_modes))
-      present_mode = vk::PresentModeKHR::eMailbox;
 
     vk::SwapchainCreateInfoKHR sc_info;
     sc_info.surface = *_window_surface;
@@ -730,7 +754,7 @@ namespace gev
     sc_info.imageSharingMode = vk::SharingMode::eExclusive;
     sc_info.imageExtent = caps.surfaceCapabilities.currentExtent;
     sc_info.oldSwapchain = *_swapchain;
-    sc_info.presentMode = present_mode;
+    sc_info.presentMode = _present_mode;
     sc_info.imageColorSpace = _swapchain_format.surfaceFormat.colorSpace;
     sc_info.imageFormat = _swapchain_format.surfaceFormat.format;
 
@@ -783,8 +807,7 @@ namespace gev
       pi.render_fence = _device->createFenceUnique(vk::FenceCreateInfo().setFlags(vk::FenceCreateFlagBits::eSignaled));
 
       pi.output_image->layout(cbufs[0].get(), vk::ImageLayout::ePresentSrcKHR,
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::AccessFlagBits2::eColorAttachmentRead,
-        _queues.present_family);
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput, {}, _queues.present_family);
     }
     cbufs[0]->end();
 

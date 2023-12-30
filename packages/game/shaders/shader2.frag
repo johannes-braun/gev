@@ -50,8 +50,8 @@ struct shadow_map
   mat4 matrix;
   mat4 inverse_matrix;
   int map_id;
-  int metadata0;
-  int metadata1;
+  int num_cascades;
+  float csm_split;    // depth
   int metadata2;
 };
 layout(set = 3, binding = 0, std430) restrict readonly buffer ShadowMaps
@@ -83,23 +83,29 @@ float linstep(float low, float high, float v)
   return clamp((v - low) / (high - low), 0.0, 1.0);
 }
 
-float shadow_vsm(int id, vec4 shadowCoord, vec2 off)
+float shadow_vsm(int id, vec4 shadowCoord, int fac)
 {
+  float factor_s = max(smoothstep(0.999, 1.0, shadowCoord.s), smoothstep(0.001, 0.0, shadowCoord.s));
+  float factor_t = max(smoothstep(0.999, 1.0, shadowCoord.t), smoothstep(0.001, 0.0, shadowCoord.s));
+
 	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0) 
 	{
-		vec2 moments = texture(shadow_maps[id], shadowCoord.st + off).xy;
+		vec2 moments = texture(shadow_maps[nonuniformEXT(id)], shadowCoord.st).xy;
+
+//    return 1-step(moments.x, shadowCoord.z - 0.002 / fac);
+
     float p = step(shadowCoord.z, moments.x);
-    float var = max(moments.y - moments.x * moments.x, 2e-5);
+    float var = max(moments.y - moments.x * moments.x, 2e-5 / pow(10, fac));
 
     float d = shadowCoord.z - moments.x;
-    float p_max = linstep(0.2, 1.0, var / (var + d*d));
+    float p_max = linstep(0.1, 1.0, var / (var + d*d));
 
-    return min(max(p_max, p), 1.0);
+    return min(max(factor_s, max(factor_t, max(p_max, p))), 1.0);
 	}
 	return 1.0;
 }
  
-float shadow_map_sample(int index, out vec3 ld)
+float shadow_map_sample(int index, out vec3 ld, out vec2 uv, int fac)
 {
   float shad = 1.0;
   shadow_map sm0 = sm.maps[index];
@@ -114,7 +120,8 @@ float shadow_map_sample(int index, out vec3 ld)
   ld = normalize(direction_far.xyz - direction_near.xyz);
 
   vec4 sp = biasMat * shadow_space;
-  return shadow_vsm(sm0.map_id, sp / sp.w, vec2(0.0));
+  uv = sp.st / sp.w;
+  return shadow_vsm(sm0.map_id, sp / sp.w, fac);
 }
 
 const vec3 ambient = 0.4 * vec3(0.24, 0.21, 0.35);
@@ -131,8 +138,8 @@ void main()
     normal = -normal;
 
   float a = diffuse_texture_color.a * smoothstep(0, 1, distance(cam_pos, vertex_position));
-  if(dithered_transparency(a, gl_FragCoord.xy))
-    discard;
+//  if(dithered_transparency(a, gl_FragCoord.xy))
+//    discard;
 
   vec3 to_cam = normalize(cam_pos - vertex_position);
 
@@ -152,7 +159,46 @@ void main()
     num_shadows += 1.0;
 
     vec3 ld;
-    float s = shadow_map_sample(i, ld);
+    float s = 1.0;
+    int num_cascades = sm.maps[i].num_cascades;
+    vec2 shadow_uv = vec2(0);
+    if(num_cascades > 0)
+    {
+      vec4 view_pos = camera.view_matrix * vec4(vertex_position, 1);
+      uint cascadeIndex = 0;
+      float split_plane = 0.0f;
+	    for(uint c = 0; c < num_cascades - 1; ++c) {
+        float split = sm.maps[i + c + 1].csm_split;
+		    if(view_pos.z < split) {	
+			    cascadeIndex = c + 1;
+          split_plane = split;
+		    }
+	    }
+
+      int next_index = min(num_cascades, int(cascadeIndex)+1);
+
+      float grad = 0.0;
+      if(next_index != num_cascades)
+      {
+        float next_plane = sm.maps[next_index].csm_split;
+        grad = smoothstep(0.9, 1.0, view_pos.z / next_plane);
+      }
+
+      s = shadow_map_sample(int(cascadeIndex) + i, ld, shadow_uv, 1 + int(cascadeIndex));
+
+      if(grad != 0.0)
+      {
+        float s2 = shadow_map_sample(int(cascadeIndex + 1) + i, ld, shadow_uv, 1 + int(cascadeIndex + 1));
+        s = mix(s, s2, grad);
+      }
+
+      i += num_cascades - 1;
+    }
+    else
+    {
+      s = shadow_map_sample(i, ld, shadow_uv, 1);
+    }
+
     ld *= -1;
 
     float ndotl = max(dot(normal, ld), 0.0);
@@ -161,7 +207,7 @@ void main()
     float ndoth = pow(max(dot(normal, half_normal), 0), shininess);
 
     diffuse += ndotl * tex_color * s * light_color;
-    specular += ndoth * s * light_color ;
+    specular += ndoth * s * light_color;
   }
 
   color = vec4(tonemap(vec3((diffuse + specular) + ambient * tex_color)), 1);

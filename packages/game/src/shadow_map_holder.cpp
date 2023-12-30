@@ -17,6 +17,18 @@ namespace gev::game
       _holder.lock()->destroy(_map);
   }
 
+  void shadow_map_instance::make_csm_root(int num_cascades)
+  {
+    if (!_holder.expired())
+      _holder.lock()->make_csm_root_internal(_byte_offset, num_cascades);
+  }
+
+  void shadow_map_instance::set_cascade_split(float num_cascades)
+  {
+    if (!_holder.expired())
+      _holder.lock()->set_cascade_split_internal(_byte_offset, num_cascades);
+  }
+
   void shadow_map_holder::update_matrix_internal(std::size_t offset, rnu::mat4 matrix)
   {
     sm_info info;
@@ -29,6 +41,35 @@ namespace gev::game
       info.inverse_matrix = inverse(matrix);
       std::memcpy(begin, &info, 2 * sizeof(rnu::mat4));
       include_update_region(offset, offset + 2 * sizeof(rnu::mat4));
+    }
+  }
+
+  void shadow_map_holder::make_csm_root_internal(std::size_t offset, int num_cascades) {
+    sm_info info;
+    std::byte* begin = reinterpret_cast<std::byte*>(_map_instances.data()) + offset;
+    std::memcpy(&info, begin, sizeof(sm_info));
+
+    if (num_cascades != info.num_cascades)
+    {
+      info.num_cascades = num_cascades;
+      std::memcpy(begin, &info, sizeof(sm_info));
+      auto const region_start = offset + offsetof(sm_info, num_cascades);
+      include_update_region(region_start, region_start + sizeof(info.num_cascades));
+    }
+  }
+
+  void shadow_map_holder::set_cascade_split_internal(std::size_t offset, float depth)
+  {
+    sm_info info;
+    std::byte* begin = reinterpret_cast<std::byte*>(_map_instances.data()) + offset;
+    std::memcpy(&info, begin, sizeof(sm_info));
+
+    if (depth != info.csm_split)
+    {
+      info.csm_split = depth;
+      std::memcpy(begin, &info, sizeof(sm_info));
+      auto const region_start = offset + offsetof(sm_info, csm_split);
+      include_update_region(region_start, region_start + sizeof(info.csm_split));
     }
   }
 
@@ -129,13 +170,37 @@ namespace gev::game
     auto& info = _map_instances[_map_instances.size() - 1];
     info.matrix = matrix;
     info.map_id = f.index;
-    info.metadata0 = 0;
-    info.metadata1 = 0;
+    info.num_cascades = 0;
+    info.csm_split = 0;
     info.metadata2 = 0;
     _map_instances.push_back({.map_id = -1});
 
     auto const begin = (_map_instances.size() - 2) * sizeof(sm_info);
     include_update_region(begin, _map_instances.size() * sizeof(sm_info));
+
+    if (!_instances_buffer || _map_instances.size() > _instances_buffer->size())
+    {
+      auto v = std::max(min_reserved_elements * sizeof(sm_info), _map_instances.size());
+      v--;
+      v |= v >> 1;
+      v |= v >> 2;
+      v |= v >> 4;
+      v |= v >> 8;
+      v |= v >> 16;
+      v |= v >> 32;
+      v++;
+
+      _instances_buffer.reset();
+
+      _instances_buffer = std::make_unique<gev::game::sync_buffer>(
+        v, vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst, 3);
+
+      //_staging_buffer = gev::buffer::host_local(v, vk::BufferUsageFlagBits::eTransferSrc);
+      //_instances_buffer =
+      //  gev::buffer::device_local(v, vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst);
+      gev::update_descriptor(
+        _map_descriptor.get(), binding_instances, _instances_buffer->buffer(), vk::DescriptorType::eStorageBuffer);
+    }
 
     auto instance = std::make_shared<shadow_map_instance>();
     instance->_byte_offset = begin;
@@ -153,61 +218,11 @@ namespace gev::game
 
   void shadow_map_holder::try_flush_buffer(vk::CommandBuffer c)
   {
-    if (_instances_buffer && _update_region_end <= _update_region_start)
+    if (_update_region_start >= _update_region_end)
       return;
 
-    if (!_instances_buffer || _update_region_end > _instances_buffer->size())
-    {
-      auto v = std::max(min_reserved_elements * sizeof(sm_info), _update_region_end);
-      v--;
-      v |= v >> 1;
-      v |= v >> 2;
-      v |= v >> 4;
-      v |= v >> 8;
-      v |= v >> 16;
-      v |= v >> 32;
-      v++;
-
-      _instances_buffer.reset();
-      _staging_buffer = gev::buffer::host_local(v, vk::BufferUsageFlagBits::eTransferSrc);
-      _instances_buffer =
-        gev::buffer::device_local(v, vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst);
-      gev::update_descriptor(
-        _map_descriptor.get(), binding_instances, *_instances_buffer, vk::DescriptorType::eStorageBuffer);
-    }
-
-    if (_update_region_end > _update_region_start)
-    {
-      auto const size = _update_region_end - _update_region_start;
-      std::byte const* begin = reinterpret_cast<std::byte const*>(_map_instances.data()) + _update_region_start;
-      _staging_buffer->load_data(begin, size, _update_region_start);
-
-      auto barr2 =
-        vk::BufferMemoryBarrier()
-          .setBuffer(_instances_buffer->get_buffer())
-          .setOffset(_update_region_start)
-          .setSize(size)
-          .setSrcAccessMask(vk::AccessFlagBits::eShaderRead)
-          .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-          .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
-          .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-      c.pipelineBarrier(vk::PipelineStageFlagBits::eFragmentShader, vk::PipelineStageFlagBits::eTransfer,
-        vk::DependencyFlagBits::eByRegion, nullptr, {barr2}, nullptr);
-
-      _staging_buffer->copy_to(c, *_instances_buffer, size, _update_region_start, _update_region_start);
-
-      auto barr =
-        vk::BufferMemoryBarrier()
-          .setBuffer(_instances_buffer->get_buffer())
-          .setOffset(_update_region_start)
-          .setSize(size)
-          .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
-          .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-          .setDstAccessMask(vk::AccessFlagBits::eShaderRead)
-          .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-      c.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader,
-        vk::DependencyFlagBits::eByRegion, nullptr, {barr}, nullptr);
-    }
+    _instances_buffer->load_data<sm_info>(_map_instances);
+    _instances_buffer->sync(c);
 
     _update_region_start = std::numeric_limits<std::size_t>::max();
     _update_region_end = std::numeric_limits<std::size_t>::lowest();

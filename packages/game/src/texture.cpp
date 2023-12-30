@@ -36,7 +36,7 @@ namespace gev::game
       [&](auto c)
       {
         _texture->generate_mipmaps(c);
-        _texture->layout(c, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eAllGraphics,
+        _texture->layout(c, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eVertexShader,
           vk::AccessFlagBits2::eShaderSampledRead);
       },
       gev::engine::get().queues().graphics_command_pool.get(), true);
@@ -82,15 +82,17 @@ namespace gev::game
 
     staging_buffer->load_data<stbi_uc>(std::span{image_data.get(), std::size_t(width * height * 4)});
 
-    gev::engine::get().execute_once([&](auto c)
-      { staging_buffer->copy_to(c, *_texture, vk::ImageAspectFlagBits::eColor); },
-      gev::engine::get().queues().graphics_command_pool.get(), true);
-
     gev::engine::get().execute_once(
       [&](auto c)
       {
+        buffer_barrier(c, *staging_buffer, vk::PipelineStageFlagBits::eHost, vk::AccessFlagBits::eHostWrite,
+          vk::PipelineStageFlagBits::eTransfer, vk::AccessFlagBits::eTransferRead);
+        staging_buffer->copy_to(c, *_texture, vk::ImageAspectFlagBits::eColor);
+        _texture->layout(c, vk::ImageLayout::eTransferSrcOptimal, vk::PipelineStageFlagBits2::eAllTransfer,
+          vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite);
+
         _texture->generate_mipmaps(c);
-        _texture->layout(c, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eAllGraphics,
+        _texture->layout(c, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eVertexShader,
           vk::AccessFlagBits2::eShaderSampledRead);
       },
       gev::engine::get().queues().graphics_command_pool.get(), true);
@@ -161,7 +163,7 @@ namespace gev::game
       [&](auto c)
       {
         _texture->generate_mipmaps(c);
-        _texture->layout(c, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eAllGraphics,
+        _texture->layout(c, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eVertexShader,
           vk::AccessFlagBits2::eShaderSampledRead);
       },
       gev::engine::get().queues().graphics_command_pool.get(), true);

@@ -165,9 +165,6 @@ namespace gev::game
 
       _color_attachment.setImageView(_color_target.view.get()).setLoadOp(vk::AttachmentLoadOp::eClear);
     }
-
-    _current_pipeline_layout = nullptr;
-    _current_pipeline = nullptr;
   }
 
   void renderer::begin_render(vk::CommandBuffer c, bool use_depth, bool use_color)
@@ -190,9 +187,6 @@ namespace gev::game
   void renderer::bind_pipeline(vk::CommandBuffer c, vk::Pipeline pipeline, vk::PipelineLayout layout)
   {
     auto const& size = _render_size;
-
-    _current_pipeline_layout = layout;
-    _current_pipeline = pipeline;
 
     c.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
     c.setViewport(0, vk::Viewport(0, 0, size.width, size.height, 0.f, 1.f));

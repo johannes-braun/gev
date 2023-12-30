@@ -47,16 +47,18 @@ namespace gev::game
 
   void mesh_renderer::try_flush(vk::CommandBuffer c)
   {
+    if (_camera)
+      _camera->sync(c);
     _shadow_map_holder->try_flush_buffer(c);
-    try_flush_batches();
+    try_flush_batches(c);
   }
 
-  void mesh_renderer::try_flush_batches()
+  void mesh_renderer::try_flush_batches(vk::CommandBuffer c)
   {
     for (auto const& b : *_batches)
     {
       for (auto const& m : b.second)
-        m.second->try_flush_buffer();
+        m.second->try_flush_buffer(c);
     }
   }
 

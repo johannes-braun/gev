@@ -38,7 +38,7 @@ namespace gev::game
     std::shared_ptr<mesh_batch> batch(std::shared_ptr<shader> const& shader, std::shared_ptr<material> const& material);
 
     void child_renderer(mesh_renderer& r, bool share_batches = true, bool share_shadow_maps = true);
-    void try_flush_batches();
+    void try_flush_batches(vk::CommandBuffer c);
     void try_flush(vk::CommandBuffer c);
 
   protected:

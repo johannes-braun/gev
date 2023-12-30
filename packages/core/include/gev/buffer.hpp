@@ -36,4 +36,7 @@ namespace gev
     unique_allocation _allocation;
     bool _host_visible;
   };
+
+  void buffer_barrier(vk::CommandBuffer c, buffer const& buf, vk::PipelineStageFlags from_stage, 
+    vk::AccessFlags from, vk::PipelineStageFlags to_stage, vk::AccessFlags to);
 }    // namespace gev

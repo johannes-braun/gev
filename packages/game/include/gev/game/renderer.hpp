@@ -49,9 +49,6 @@ namespace gev::game
 
     vk::ImageUsageFlags _color_usage_flags;
 
-    vk::PipelineLayout _current_pipeline_layout;
-    vk::Pipeline _current_pipeline;
-
     vk::Extent2D _render_size;
     bool _used_depth = false;
     bool _used_color = false;

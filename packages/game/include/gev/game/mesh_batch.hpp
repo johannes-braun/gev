@@ -2,6 +2,7 @@
 
 #include <gev/engine.hpp>
 #include <gev/game/mesh.hpp>
+#include <gev/game/sync_buffer.hpp>
 #include <memory>
 #include <rnu/math/math.hpp>
 #include <unordered_map>
@@ -24,10 +25,6 @@ namespace gev::game
     std::size_t _byte_offset = 0;
   };
 
-  enum class mesh_id : std::size_t
-  {
-  };
-
   class mesh_batch : public std::enable_shared_from_this<mesh_batch>
   {
   public:
@@ -38,7 +35,7 @@ namespace gev::game
     std::shared_ptr<mesh_instance> instantiate(std::shared_ptr<mesh> const& id, rnu::mat4 transform);
     void destroy(std::shared_ptr<mesh_instance> instance);
     void destroy(mesh_instance const& instance);
-    void try_flush_buffer();
+    void try_flush_buffer(vk::CommandBuffer c);
 
     vk::DescriptorSet descriptor() const;
 
@@ -66,7 +63,7 @@ namespace gev::game
     std::vector<mesh_info> _mesh_infos;
     std::size_t _update_region_start = std::numeric_limits<std::size_t>::max();
     std::size_t _update_region_end = std::numeric_limits<std::size_t>::lowest();
-    std::unique_ptr<gev::buffer> _instances_buffer;
+    std::unique_ptr<gev::game::sync_buffer> _instances_buffer;
 
     vk::UniqueDescriptorPool _mesh_pool;
     vk::UniqueDescriptorSet _mesh_descriptor;

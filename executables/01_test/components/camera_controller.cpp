@@ -10,7 +10,7 @@ void camera_controller::spawn()
   }
 }
 
-void camera_controller::update()
+void camera_controller::early_update()
 {
   _base_camera.set_position(owner()->global_transform().position);
   _base_camera.replace_rotation(owner()->global_transform().rotation);
@@ -64,6 +64,8 @@ void camera_controller::update()
   {
     auto const size = gev::engine::get().swapchain_size();
     _camera.lock()->camera()->set_projection(
-      rnu::cameraf::projection(rnu::radians(60.0f), size.width / float(size.height), 0.01f, 1000.0f, false, true));
+      gev::game::perspective(rnu::radians(60.0f), 
+        size.width / float(size.height), 
+        0.01f, 500.0f));
   }
 }

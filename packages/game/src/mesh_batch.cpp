@@ -142,7 +142,7 @@ namespace gev::game
     }
   }
 
-  void mesh_batch::try_flush_buffer()
+  void mesh_batch::try_flush_buffer(vk::CommandBuffer c)
   {
     if (_instances_buffer && _update_region_end <= _update_region_start)
       return;
@@ -160,17 +160,18 @@ namespace gev::game
       v++;
 
       _instances_buffer.reset();
+      _instances_buffer = std::make_unique<gev::game::sync_buffer>(v, vk::BufferUsageFlagBits::eStorageBuffer, 3);
 
-      _instances_buffer = gev::buffer::host_accessible(v, vk::BufferUsageFlagBits::eStorageBuffer);
       gev::update_descriptor(
-        _mesh_descriptor.get(), binding_instances, *_instances_buffer, vk::DescriptorType::eStorageBuffer);
+          _mesh_descriptor.get(), binding_instances, _instances_buffer->buffer(), vk::DescriptorType::eStorageBuffer);
     }
 
-    if (_update_region_end > _update_region_start)
+    /*if (_update_region_end > _update_region_start)
     {
-      std::byte const* begin = reinterpret_cast<std::byte const*>(_mesh_infos.data()) + _update_region_start;
-      _instances_buffer->load_data(begin, _update_region_end - _update_region_start, _update_region_start);
-    }
+      std::byte const* begin = reinterpret_cast<std::byte const*>(_mesh_infos.data()) + _update_region_start;*/
+    _instances_buffer->load_data<mesh_info>(_mesh_infos);
+    //}
+    _instances_buffer->sync(c);
 
     _update_region_start = std::numeric_limits<std::size_t>::max();
     _update_region_end = std::numeric_limits<std::size_t>::lowest();

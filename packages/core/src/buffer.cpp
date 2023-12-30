@@ -141,8 +141,10 @@ namespace gev
         .setSize(size)
         .setDstAccessMask(vk::AccessFlagBits::eTransferWrite);
 
-    c.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eTransfer,
-      vk::DependencyFlagBits::eByRegion, nullptr, {barr, barr2}, nullptr);
+    c.pipelineBarrier(vk::PipelineStageFlagBits::eHost, vk::PipelineStageFlagBits::eTransfer,
+      vk::DependencyFlagBits::eByRegion, nullptr, {barr}, nullptr);
+    c.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer,
+      vk::DependencyFlagBits::eByRegion, nullptr, {barr2}, nullptr);
     c.copyBuffer(_buffer.get(), other.get_buffer(), vk::BufferCopy(src_offset, dst_offset, size));
 
     barr.setSrcAccessMask(vk::AccessFlagBits::eTransferRead)
@@ -151,10 +153,12 @@ namespace gev
       .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
     barr2.setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
       .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-      .setDstAccessMask(vk::AccessFlagBits::eVertexAttributeRead)
+      .setDstAccessMask({})
       .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-    c.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eAllCommands,
-      vk::DependencyFlagBits::eByRegion, nullptr, {barr, barr2}, nullptr);
+    c.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost,
+      vk::DependencyFlagBits::eByRegion, nullptr, {barr}, nullptr);
+    c.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eBottomOfPipe,
+      vk::DependencyFlagBits::eByRegion, nullptr, {barr2}, nullptr);
   }
 
   vk::Buffer buffer::get_buffer() const
@@ -165,5 +169,21 @@ namespace gev
   std::size_t buffer::size() const noexcept
   {
     return _size;
+  }
+
+  void buffer_barrier(vk::CommandBuffer c, buffer const& buf, 
+    vk::PipelineStageFlags from_stage, vk::AccessFlags from,
+    vk::PipelineStageFlags to_stage, vk::AccessFlags to)
+  {
+    auto const barrier =
+      vk::BufferMemoryBarrier()
+        .setBuffer(buf.get_buffer())
+        .setOffset(0)
+        .setSize(buf.size())
+        .setSrcAccessMask(from)
+        .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+        .setDstAccessMask(to)
+        .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+    c.pipelineBarrier(from_stage, to_stage, vk::DependencyFlagBits::eByRegion, nullptr, {barrier}, nullptr);
   }
 }    // namespace gev
