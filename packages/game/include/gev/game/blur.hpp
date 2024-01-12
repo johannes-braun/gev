@@ -15,7 +15,8 @@ namespace gev::game
   {
   public:
     blur();
-    void apply(vk::CommandBuffer c, blur_dir dir, float step_size, render_target_2d const& src, render_target_2d const& dst);
+    void apply(vk::CommandBuffer c, blur_dir dir, float step_size, 
+      render_target_2d const& src, render_target_2d const& dst);
 
   private:
     vk::UniquePipeline _pipeline;

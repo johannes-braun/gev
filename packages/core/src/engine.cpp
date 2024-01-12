@@ -235,7 +235,7 @@ namespace gev
 
     _services.register_existing_service<audio::audio_host>(audio::audio_host::create());
     register_service<scenery::entity_manager>();
-    register_service<scenery::collision_system>();
+    _services.register_existing_service(scenery::collision_system::get_default());
     register_service<audio_repo>();
   }
 
@@ -313,7 +313,7 @@ namespace gev
       if (first_frame)
       {
         entity_manager->spawn();
-        first_frame = false;
+        first_frame = false; 
       }
 
       _current_frame.delta_time = delta;
@@ -594,9 +594,13 @@ namespace gev
     extd3.setExtendedDynamicState3RasterizationSamples(true);
     ft12.pNext = &extd3;
 
+    vk::PhysicalDeviceRobustness2FeaturesEXT robust;
+    robust.setNullDescriptor(true);
+    extd3.pNext = &robust;
+
     const std::array required_device_extensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_SHADER_CLOCK_EXTENSION_NAME,
       VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME, VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
-      VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME};
+      VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME, VK_EXT_ROBUSTNESS_2_EXTENSION_NAME};
 
     std::vector<const char*> found_device_extensions;
     for (auto const& req : required_device_extensions)
@@ -821,6 +825,7 @@ namespace gev
 
     for (auto& callback : _resize_callbacks)
       callback(_swapchain_size.width, _swapchain_size.height);
+    _device->waitIdle();
   }
 
   descriptor_allocator& engine::get_descriptor_allocator()

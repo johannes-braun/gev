@@ -2,9 +2,13 @@
 
 namespace gev::scenery
 {
-  animation::animation(
-    animation_target target, size_t node_index, checkpoints checkpoints, std::vector<float> timestamps)
-    : _node_index(node_index), _target(target), _checkpoints(std::move(checkpoints)), _timestamps(std::move(timestamps))
+  animation::animation(animation_target target, size_t node_index, std::vector<rnu::vec3> vec3_checkpoints,
+    std::vector<rnu::quat> quat_checkpoints, std::vector<float> timestamps)
+    : _node_index(node_index),
+      _target(target),
+      _vec3_checkpoints(std::move(vec3_checkpoints)),
+      _quat_checkpoints(std::move(quat_checkpoints)),
+      _timestamps(std::move(timestamps))
   {
   }
   float animation::duration() const
@@ -32,32 +36,50 @@ namespace gev::scenery
     {
       case animation_target::location:
       {
-        auto const& locations = std::get<0>(_checkpoints);
+        auto const& locations = _vec3_checkpoints;
         auto const calc = interp(locations[current_ts_index], locations[next_ts_index], i);
-        auto const attenuated = interp(n.lrs().location, calc, mix_factor);
+        auto const attenuated = interp(n.transformation.position, calc, mix_factor);
 
-        n.set_location(attenuated);
+        n.transformation.position = attenuated;
         break;
       }
       case animation_target::rotation:
       {
-        auto const& rotations = std::get<1>(_checkpoints);
+        auto const& rotations = _quat_checkpoints;
         auto const rot = interp(rotations[current_ts_index], rotations[next_ts_index], i);
-        auto const attenuated = interp(n.lrs().rotation, rot, mix_factor);
+        auto const attenuated = interp(n.transformation.rotation, rot, mix_factor);
 
-        n.set_rotation(attenuated);
+        n.transformation.rotation = attenuated;
         break;
       }
       case animation_target::scale:
       {
-        auto const& scales = std::get<0>(_checkpoints);
+        auto const& scales = _vec3_checkpoints;
         auto const sca = interp(scales[current_ts_index], scales[next_ts_index], i);
-        auto const attenuated = interp(n.lrs().scale, sca, mix_factor);
+        auto const attenuated = interp(n.transformation.scale, sca, mix_factor);
 
-        n.set_scale(attenuated);
+        n.transformation.scale = attenuated;
         break;
       }
     }
+  }
+
+  void animation::serialize(serializer& base, std::ostream& out) 
+  {
+    write_typed(_node_index, out);
+    write_typed(_target, out);
+    write_vector(_vec3_checkpoints, out);
+    write_vector(_quat_checkpoints, out);
+    write_vector(_timestamps, out);
+  }
+
+  void animation::deserialize(serializer& base, std::istream& in)
+  {
+    read_typed(_node_index, in);
+    read_typed(_target, in);
+    read_vector(_vec3_checkpoints, in);
+    read_vector(_quat_checkpoints, in);
+    read_vector(_timestamps, in);
   }
 
   skin::skin(size_t root, std::vector<std::uint32_t> joint_nodes, std::vector<rnu::mat4> joint_matrices)
@@ -99,6 +121,22 @@ namespace gev::scenery
     return _global_joint_matrices;
   }
 
+  void skin::serialize(serializer& base, std::ostream& out)
+  {
+    write_size(_root_node, out);
+    write_vector(_joint_nodes, out);
+    write_vector(_joint_matrices, out);
+    write_vector(_global_joint_matrices, out);
+  }
+
+  void skin::deserialize(serializer& base, std::istream& in)
+  {
+    read_size(_root_node, in);
+    read_vector(_joint_nodes, in);
+    read_vector(_joint_matrices, in);
+    read_vector(_global_joint_matrices, in);
+  }
+
   transform_tree::transform_tree(std::vector<transform_node> nodes)
     : _nodes(std::move(nodes)), _global_matrices(_nodes.size(), rnu::mat4(1.0f))
   {
@@ -125,7 +163,7 @@ namespace gev::scenery
   {
     for (int i = 0; i < _nodes.size(); ++i)
     {
-      _global_matrices[i] = _nodes[i].matrix();
+      _global_matrices[i] = _nodes[i].transformation.matrix();
     }
 
     for (int i = 0; i < _nodes.size(); ++i)
@@ -135,6 +173,38 @@ namespace gev::scenery
         _global_matrices[i] = _global_matrices[_nodes[i].parent] * _global_matrices[i];
       }
     }
+  }
+
+  void transform_tree::serialize(serializer& base, std::ostream& out)
+  {
+    write_size(_nodes.size(), out);
+    for (auto const& node : _nodes)
+    {
+      write_string(node.name, out);
+      write_size(node.mesh_reference, out);
+      write_typed(node.children_offset, out);
+      write_size(node.num_children, out);
+      write_typed(node.parent, out);
+      write_typed(node.transformation, out);
+    }
+    write_vector(_global_matrices, out);
+  }
+
+  void transform_tree::deserialize(serializer& base, std::istream& in)
+  {
+    std::size_t count = 0ull;
+    read_size(count, in);
+    _nodes.resize(count);
+    for (auto& node : _nodes)
+    {
+      read_string(node.name, in);
+      read_size(node.mesh_reference, in);
+      read_typed(node.children_offset, in);
+      read_size(node.num_children, in);
+      read_typed(node.parent, in);
+      read_typed(node.transformation, in);
+    }
+    read_vector(_global_matrices, in);
   }
 
   void joint_animation::set(std::vector<animation> anim, bool one_shot)
@@ -172,51 +242,31 @@ namespace gev::scenery
       a.transform(_time, float(_ramp_up.value()), nodes);
   }
 
-  transform_node::loc_rot_scale& transform_node::lrs()
+  void joint_animation::serialize(serializer& base, std::ostream& out) 
   {
-    return std::get<loc_rot_scale>(transformation);
-  }
-
-  transform_node::loc_rot_scale const& transform_node::lrs() const
-  {
-    return std::get<loc_rot_scale>(transformation);
-  }
-
-  void transform_node::set_location(rnu::vec3 location)
-  {
-    std::get<loc_rot_scale>(transformation).location = location;
-  }
-
-  void transform_node::set_rotation(rnu::quat rotation)
-  {
-    std::get<loc_rot_scale>(transformation).rotation = rotation;
-  }
-
-  void transform_node::set_scale(rnu::vec3 scale)
-  {
-    std::get<loc_rot_scale>(transformation).scale = scale;
-  }
-
-  void transform_node::set_matrix(rnu::mat4 matrix)
-  {
-    std::get<rnu::mat4>(transformation) = matrix;
-  }
-
-  rnu::mat4 transform_node::matrix() const
-  {
-    static constexpr struct
+    write_typed(_anim.one_shot, out);
+    write_typed(_longest_duration, out);
+    write_size(_anim.animation.size(), out);
+    for (auto& anim : _anim.animation)
     {
-      rnu::mat4 operator()(rnu::mat4 const& mat) const
-      {
-        return mat;
-      }
-
-      rnu::mat4 operator()(loc_rot_scale const& lrs) const
-      {
-        return rnu::translation(lrs.location) * rnu::rotation(lrs.rotation) * rnu::scale(lrs.scale);
-      }
-    } visitor{};
-    return std::visit(visitor, transformation);
+      anim.serialize(base, out);
+    }
   }
 
+  void joint_animation::deserialize(serializer& base, std::istream& in) 
+  {
+    read_typed(_anim.one_shot, in);
+    read_typed(_longest_duration, in);
+    std::size_t count = 0ull;
+    read_typed(count, in);
+    _anim.animation.resize(count);
+    for (auto& anim : _anim.animation)
+    {
+      anim.deserialize(base, in);
+    }
+    _time = 0.0;
+    _ramp_up = 0;
+    _ramp_up.to(1.0);
+    _current = 0;
+  }
 }    // namespace gev::scenery

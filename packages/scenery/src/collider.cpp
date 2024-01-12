@@ -2,6 +2,7 @@
 #include <bullet/btBulletDynamicsCommon.h>
 #include <gev/scenery/collider.hpp>
 #include <memory>
+#include <bullet/BulletFileLoader/btBulletFile.h>
 
 namespace gev::scenery
 {
@@ -67,6 +68,12 @@ namespace gev::scenery
         }
       }
     }
+  }
+
+  std::shared_ptr<collision_system> collision_system::get_default()
+  {
+    static std::shared_ptr<collision_system> default_system = std::make_shared<collision_system>();
+    return default_system;
   }
 
   collision_system::collision_system()
@@ -151,16 +158,30 @@ namespace gev::scenery
     _world->removeRigidBody(obj);
   }
 
-  collider_component::collider_component(
-    std::shared_ptr<collision_system> system, std::shared_ptr<btCollisionShape> obj, float mass, bool is_static, int group, int mask)
-    : _system(std::move(system)), _collision_object(std::move(obj)), _group(group), _mask(mask)
+  collider_component::collider_component() : _system(collision_system::get_default())
   {
+
+  }
+
+  collider_component::collider_component(std::shared_ptr<collision_shape> obj,
+    float mass, bool is_static, int group, int mask)
+    : collider_component()
+  {
+    _collision_object = std::move(obj);
+    _group = group;
+    _mask = mask;
     _motion_state = std::make_unique<btDefaultMotionState>();
-    _rigid_body = std::make_unique<btRigidBody>(mass, _motion_state.get(), _collision_object.get());
+    _rigid_body = std::make_unique<btRigidBody>(mass, _motion_state.get(), _collision_object->get_shape());
     _rigid_body->setUserPointer(this);
 
     if (is_static)
       _rigid_body->setCollisionFlags(_rigid_body->getCollisionFlags() | btCollisionObject::CF_STATIC_OBJECT);
+  }
+
+  void collider_component::set_shape(std::shared_ptr<collision_shape> shape)
+  {
+    _rigid_body->setCollisionShape(shape->get_shape());
+    _collision_object = std::move(shape);
   }
 
   void collider_component::activate()
@@ -235,5 +256,38 @@ namespace gev::scenery
     auto const p = owner()->global_transform().position;
     _rigid_body->setActivationState(ACTIVE_TAG);
     _rigid_body->setLinearVelocity({x, y, z});
+  }
+
+  constexpr auto collision_object_name = "_collisionObject";
+
+  void collider_component::serialize(serializer& base, std::ostream& out) 
+  {
+    float mass = _rigid_body->getMass();
+    bool is_static =
+      (_rigid_body->getCollisionFlags() & btCollisionObject::CF_STATIC_OBJECT) == btCollisionObject::CF_STATIC_OBJECT;
+
+    write_typed(mass, out);
+    write_typed(is_static, out);
+    write_typed(_group, out);
+    write_typed(_mask, out);
+    base.write_direct_or_reference(out, _collision_object);
+  }
+
+  void collider_component::deserialize(serializer& base, std::istream& in)
+  {
+    float mass = 1.0f;
+    bool is_static = false;
+    read_typed(mass, in);
+    read_typed(is_static, in);
+    read_typed(_group, in);
+    read_typed(_mask, in);
+    _collision_object = as<gev::scenery::collision_shape>(base.read_direct_or_reference(in));
+
+    _motion_state = std::make_unique<btDefaultMotionState>();
+    _rigid_body = std::make_unique<btRigidBody>(mass, _motion_state.get(), _collision_object->get_shape());
+    _rigid_body->setUserPointer(this);
+
+    if (is_static)
+      _rigid_body->setCollisionFlags(_rigid_body->getCollisionFlags() | btCollisionObject::CF_STATIC_OBJECT);
   }
 }    // namespace gev::scenery

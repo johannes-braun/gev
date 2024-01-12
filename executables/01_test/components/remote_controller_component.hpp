@@ -12,6 +12,9 @@ public:
   void spawn() override;
   void update() override;
 
+  void serialize(gev::serializer& base, std::ostream& out) override;
+  void deserialize(gev::serializer& base, std::istream& in) override;
+
 private:
   std::weak_ptr<gev::scenery::collider_component> _collider;
   std::weak_ptr<skin_component> _skin;

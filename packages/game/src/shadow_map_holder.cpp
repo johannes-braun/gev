@@ -216,7 +216,7 @@ namespace gev::game
     _update_region_end = std::max(_update_region_end, end);
   }
 
-  void shadow_map_holder::try_flush_buffer(vk::CommandBuffer c)
+  void shadow_map_holder::sync(vk::CommandBuffer c)
   {
     if (_update_region_start >= _update_region_end)
       return;

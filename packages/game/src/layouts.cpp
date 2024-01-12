@@ -39,6 +39,11 @@ namespace gev::game
       gev::descriptor_layout_creator::get()
         .bind(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eAllGraphics)
         .build();
+
+    _environment_set_layout =
+      gev::descriptor_layout_creator::get()
+                           .bind(0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eAllGraphics)
+                           .build();
   }
 
   vk::DescriptorSetLayout layouts::object_set_layout() const
@@ -64,5 +69,10 @@ namespace gev::game
   vk::DescriptorSetLayout layouts::skinning_set_layout() const
   {
     return *_skinning_set_layout;
+  }
+
+  vk::DescriptorSetLayout layouts::environment_set_layout() const
+  {
+    return *_environment_set_layout;
   }
 }    // namespace gev::game

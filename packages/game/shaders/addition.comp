@@ -24,8 +24,8 @@ void main()
   ivec2 pixel = ivec2(gid);
   vec2 pixelf = vec2(pixel) / max_sizef;
 
-  vec4 color1 = texture(in_texture1, pixelf);
-  vec4 color2 = texture(in_texture2, pixelf);
+  vec4 color1 = texelFetch(in_texture1, pixel, 0);
+  vec4 color2 = texelFetch(in_texture2, pixel, 0);
   vec4 result = color1 + options.factor * color2;
   imageStore(out_texture, pixel, result);
 }

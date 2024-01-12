@@ -94,7 +94,7 @@ namespace gev::game
 
       c.camera = std::make_shared<gev::game::camera>();
       c.renderer = std::make_shared<gev::game::renderer>(_size, vk::SampleCountFlagBits::e1);
-      c.renderer->set_color_format(vk::Format::eR32G32Sfloat);
+      c.renderer->set_color_format(gev::game::formats::shadow_pass);
       c.renderer->add_color_usage(vk::ImageUsageFlagBits::eStorage);
       c.renderer->set_clear_color({1.0f, 1.0f, 0.0f, 0.0f});
     }
@@ -104,17 +104,15 @@ namespace gev::game
     _blur = std::make_unique<blur>();
   }
 
-  void cascaded_shadow_mapping::enable()
+  void cascaded_shadow_mapping::enable(shadow_map_holder& src)
   {
     for (auto& c : _cascades)
     {
       if (!c.instance)
       {
-        auto const r = gev::service<gev::game::mesh_renderer>();
-        auto img = c.renderer->color_target().image();
+        auto const& img = c.renderer->color_target().image();
         auto view = c.renderer->color_target().view();
-
-        c.instance = r->get_shadow_map_holder()->instantiate(img, c.camera->projection_matrix() * c.camera->view());
+        c.instance = src.instantiate(img, c.camera->projection_matrix() * c.camera->view());
       }
     }
 
@@ -133,16 +131,17 @@ namespace gev::game
     }
   }
 
-  void cascaded_shadow_mapping::render(vk::CommandBuffer cmd, gev::game::mesh_renderer& r, rnu::vec3 direction)
+  void cascaded_shadow_mapping::render(
+    vk::CommandBuffer cmd, gev::game::camera const& cam, gev::game::mesh_renderer& r, rnu::vec3 direction)
   {
     // SHADOW MAP
-    auto const main_camera = r.get_camera();
-    float nearClip = rnu::near_plane(main_camera->projection());
-    float farClip = rnu::far_plane(main_camera->projection());
+    auto const& main_camera = cam;
+    float nearClip = rnu::near_plane(main_camera.projection());
+    float farClip = rnu::far_plane(main_camera.projection());
     float clipRange = farClip - nearClip;
 
     float minZ = nearClip;
-    float maxZ = nearClip + 100;
+    float maxZ = nearClip + 60;
 
     float range = maxZ - minZ;
     float ratio = maxZ / minZ;
@@ -162,37 +161,34 @@ namespace gev::game
     for (auto const& c : _cascades)
     {
       auto const this_split = c.split;
-      apply_cascade(
-        *c.camera, main_camera->view(), main_camera->projection_matrix(), direction, last_split, this_split);
+      apply_cascade(*c.camera, main_camera.view(), main_camera.projection_matrix(), direction, last_split, this_split);
       c.camera->sync(cmd);
       auto const split_depth = (nearClip + last_split * clipRange) * -1.0f;
       c.instance->set_cascade_split(split_depth);
       c.instance->update_transform(c.camera->projection_matrix() * c.camera->view());
       last_split = this_split;
     }
-    r.try_flush(cmd);
+    r.sync(cmd);
     gev::engine::get().device().waitIdle();
 
     int num = 0;
     for (auto const& c : _cascades)
     {
-      r.set_camera(c.camera);
-
       auto& src = c.renderer->color_target();
 
       c.renderer->prepare_frame(cmd);
       c.renderer->begin_render(cmd);
-      r.render(cmd, 0, 0, _size.width, _size.height, gev::game::pass_id::shadow, vk::SampleCountFlagBits::e1);
+      r.render(
+        cmd, *c.camera, 0, 0, _size.width, _size.height, gev::game::pass_id::shadow, vk::SampleCountFlagBits::e1);
       c.renderer->end_render(cmd);
 
-      _blur->apply(cmd, gev::game::blur_dir::horizontal, 1.2f / (num + 1), src, *_blur_tmp);
-      _blur->apply(cmd, gev::game::blur_dir::vertical, 1.2f / (num + 1), *_blur_tmp, src);
+      _blur->apply(cmd, gev::game::blur_dir::horizontal, 1.4f / (num + 1), src, *_blur_tmp);
+      _blur->apply(cmd, gev::game::blur_dir::vertical, 1.4f / (num + 1), *_blur_tmp, src);
 
       src.image()->layout(cmd, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eFragmentShader,
         vk::AccessFlagBits2::eShaderSampledRead);
 
       ++num;
     }
-    r.set_camera(main_camera);
   }
 }    // namespace gev::game

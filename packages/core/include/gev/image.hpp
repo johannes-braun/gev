@@ -38,6 +38,7 @@ namespace gev
     uint32_t mip_levels() const;
     uint32_t array_layers() const;
     vk::SampleCountFlagBits samples() const;
+    std::size_t size_bytes() const;
 
     vk::ImageMemoryBarrier2 make_to_barrier() const;
     vk::ImageMemoryBarrier2 make_from_barrier() const;

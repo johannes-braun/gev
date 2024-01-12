@@ -75,13 +75,83 @@ namespace gev
     }
   }
 
-  void buffer::copy_to(vk::CommandBuffer c, image const& other, vk::ImageAspectFlagBits aspect, int mip_layer)
+  void buffer::get_data(void* data, std::uint32_t size, std::uint32_t offset)
+  {
+    if (_host_visible)
+    {
+      auto const& allocator = engine::get().allocator();
+
+      auto const buffer_size = size;
+      VmaAllocationInfo ai{};
+      vmaGetAllocationInfo(allocator.get(), _allocation.get(), &ai);
+
+      void* memory = nullptr;
+      vmaMapMemory(allocator.get(), _allocation.get(), &memory);
+      std::byte* src = static_cast<std::byte*>(memory) + offset;
+      std::memcpy(data, src, size);
+      vmaUnmapMemory(allocator.get(), _allocation.get());
+    }
+    else
+    {
+      auto const pool = engine::get().queues().transfer_command_pool.get();
+
+      auto const staging_buffer = host_local(size, vk::BufferUsageFlagBits::eTransferDst);
+      engine::get().execute_once([&](auto c) { copy_to(c, *staging_buffer, size, 0, offset); }, pool, true);
+      staging_buffer->get_data(data, size, offset);
+    }
+  }
+
+  void buffer::copy_from(
+    vk::CommandBuffer c, image const& other, vk::ImageAspectFlagBits aspect, int mip_level, std::size_t buffer_offset)
   {
     auto const extends = other.extent();
 
-    auto const w = std::max(extends.width << mip_layer, 1u);
-    auto const h = std::max(extends.height << mip_layer, 1u);
-    auto const d = std::max(extends.depth << mip_layer, 1u);
+    auto const w = std::max(extends.width >> mip_level, 1u);
+    auto const h = std::max(extends.height >> mip_level, 1u);
+    auto const d = std::max(extends.depth >> mip_level, 1u);
+
+    vk::ImageMemoryBarrier2 bar_l0 = other.make_from_barrier();
+    bar_l0.newLayout = vk::ImageLayout::eTransferSrcOptimal;
+    bar_l0.dstStageMask = vk::PipelineStageFlagBits2::eTransfer;
+    bar_l0.dstQueueFamilyIndex = gev::engine::get().queues().transfer_family;
+    bar_l0.dstAccessMask = vk::AccessFlagBits2::eTransferRead;
+
+    vk::DependencyInfo dep;
+    dep.dependencyFlags = vk::DependencyFlagBits::eByRegion;
+    dep.setImageMemoryBarriers(bar_l0);
+    c.pipelineBarrier2(dep);
+
+    vk::BufferImageCopy region;
+    region.bufferImageHeight = h;
+    region.bufferOffset = buffer_offset;
+    region.bufferRowLength = w;
+    region.imageExtent = vk::Extent3D(w, h, d);
+    region.imageOffset = vk::Offset3D{0, 0, 0};
+    region.imageSubresource = vk::ImageSubresourceLayers(aspect, mip_level, 0, other.array_layers());
+    c.copyImageToBuffer(other.get_image(), vk::ImageLayout::eTransferSrcOptimal, _buffer.get(), region);
+
+    bar_l0 = other.make_to_barrier();
+
+    if (bar_l0.newLayout != vk::ImageLayout::eUndefined)
+    {
+      bar_l0.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
+      bar_l0.srcStageMask = vk::PipelineStageFlagBits2::eTransfer;
+      bar_l0.srcQueueFamilyIndex = gev::engine::get().queues().transfer_family;
+      bar_l0.srcAccessMask = vk::AccessFlagBits2::eTransferRead;
+      dep.dependencyFlags = vk::DependencyFlagBits::eByRegion;
+      dep.setImageMemoryBarriers(bar_l0);
+      c.pipelineBarrier2(dep);
+    }
+  }
+
+  void buffer::copy_to(
+    vk::CommandBuffer c, image const& other, vk::ImageAspectFlagBits aspect, int mip_level, std::size_t buffer_offset)
+  {
+    auto const extends = other.extent();
+
+    auto const w = std::max(extends.width >> mip_level, 1u);
+    auto const h = std::max(extends.height >> mip_level, 1u);
+    auto const d = std::max(extends.depth >> mip_level, 1u);
 
     vk::ImageMemoryBarrier2 bar_l0 = other.make_from_barrier();
     bar_l0.newLayout = vk::ImageLayout::eTransferDstOptimal;
@@ -96,11 +166,11 @@ namespace gev
 
     vk::BufferImageCopy region;
     region.bufferImageHeight = h;
-    region.bufferOffset = 0;
+    region.bufferOffset = buffer_offset;
     region.bufferRowLength = w;
     region.imageExtent = vk::Extent3D(w, h, d);
     region.imageOffset = vk::Offset3D{0, 0, 0};
-    region.imageSubresource = vk::ImageSubresourceLayers(aspect, mip_layer, 0, other.array_layers());
+    region.imageSubresource = vk::ImageSubresourceLayers(aspect, mip_level, 0, other.array_layers());
     c.copyBufferToImage(_buffer.get(), other.get_image(), vk::ImageLayout::eTransferDstOptimal, region);
 
     bar_l0 = other.make_to_barrier();
@@ -171,8 +241,7 @@ namespace gev
     return _size;
   }
 
-  void buffer_barrier(vk::CommandBuffer c, buffer const& buf, 
-    vk::PipelineStageFlags from_stage, vk::AccessFlags from,
+  void buffer_barrier(vk::CommandBuffer c, buffer const& buf, vk::PipelineStageFlags from_stage, vk::AccessFlags from,
     vk::PipelineStageFlags to_stage, vk::AccessFlags to)
   {
     auto const barrier =

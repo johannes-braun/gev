@@ -3,7 +3,7 @@
 layout(location = 2) in vec2 vertex_texcoord;
 
 layout(set = 1, binding = 0) uniform sampler2D diffuse_texture;
-layout(location = 0) out vec4 color;
+layout(location = 0) out float color;
 
 mat4 thresholdMatrix =
 mat4(
@@ -13,11 +13,13 @@ mat4(
   16.0 / 17.0,  8.0 / 17.0, 14.0 / 17.0,  6.0 / 17.0
 );
 
+float linearize_depth(float d,float zNear,float zFar)
+{
+    return zNear * zFar / (zFar + d * (zNear - zFar));
+}
+
 void main()
 {
   float depth = gl_FragCoord.z;
-  float dx = dFdx(depth);
-  float dy = dFdy(depth);
-  float moment2 = depth * depth + 0.25 * (dx * dx + dy * dy);
-  color = vec4(depth, moment2, 0, 0);
+  color = linearize_depth(depth, 0.01, 100.0);
 }

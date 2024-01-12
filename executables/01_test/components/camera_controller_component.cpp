@@ -4,10 +4,7 @@ void camera_controller_component::spawn()
 {
   _camera = owner()->get<camera_component>();
   if (auto c = _camera.lock())
-  {
-    auto const r = gev::service<gev::game::mesh_renderer>();
-    r->set_camera(c->camera());
-  }
+    c->set_main();
 }
 
 void camera_controller_component::early_update()

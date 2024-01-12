@@ -2,8 +2,6 @@
 
 #extension GL_EXT_nonuniform_qualifier : require
 
-#include "dithering.glsl"
-
 layout(constant_id = 0) const int pass_id = 0;
 
 layout(location = 0) in vec3 vertex_position;
@@ -30,6 +28,8 @@ layout(set = 1, binding = 2) restrict readonly buffer MaterialInfo
   uint roughness_metadata;
   uint flags;
 } material;
+
+layout(set = 4, binding = 0) uniform samplerCube environment_map;
 
 vec4 sample_diffuse(vec2 uv)
 {
@@ -83,7 +83,12 @@ float linstep(float low, float high, float v)
   return clamp((v - low) / (high - low), 0.0, 1.0);
 }
 
-float shadow_vsm(int id, vec4 shadowCoord, int fac)
+float linearize_depth(float d,float zNear,float zFar)
+{
+    return zNear * zFar / (zFar + d * (zNear - zFar));
+}
+
+float shadow_esm(int id, vec4 shadowCoord, int fac)
 {
   float factor_s = max(smoothstep(0.999, 1.0, shadowCoord.s), smoothstep(0.001, 0.0, shadowCoord.s));
   float factor_t = max(smoothstep(0.999, 1.0, shadowCoord.t), smoothstep(0.001, 0.0, shadowCoord.s));
@@ -92,13 +97,9 @@ float shadow_vsm(int id, vec4 shadowCoord, int fac)
 	{
 		vec2 moments = texture(shadow_maps[nonuniformEXT(id)], shadowCoord.st).xy;
 
-    float p = step(shadowCoord.z, moments.x);
-    float var = max(moments.y - moments.x * moments.x, 2e-5 / pow(10, fac));
-
-    float d = shadowCoord.z - moments.x;
-    float p_max = linstep(0.1, 1.0, var / (var + d*d));
-
-    return min(max(factor_s, max(factor_t, max(p_max, p))), 1.0);
+    float lin_depth = linearize_depth(shadowCoord.z, 0.01, 100.0);
+    float fac = linstep(0.1, 1.0, exp(10000 * fac * (moments.x - lin_depth)));
+    return min(max(factor_s, max(factor_t, fac)), 1.0);
 	}
 	return 1.0;
 }
@@ -119,10 +120,9 @@ float shadow_map_sample(int index, out vec3 ld, out vec2 uv, int fac)
 
   vec4 sp = biasMat * shadow_space;
   uv = sp.st / sp.w;
-  return shadow_vsm(sm0.map_id, sp / sp.w, fac);
+  return shadow_esm(sm0.map_id, sp / sp.w, fac);
 }
 
-const vec3 ambient = 0.4 * vec3(0.24, 0.21, 0.35);
 const vec3 light_color = 1.5 * vec3(1, 0.98, 0.96);
 
 void main()
@@ -136,8 +136,6 @@ void main()
     normal = -normal;
 
   float a = diffuse_texture_color.a * smoothstep(0, 1, distance(cam_pos, vertex_position));
-//  if(dithered_transparency(a, gl_FragCoord.xy))
-//    discard;
 
   vec3 to_cam = normalize(cam_pos - vertex_position);
 
@@ -208,5 +206,6 @@ void main()
     specular += ndoth * s * light_color;
   }
 
+  vec3 ambient = texture(environment_map, normal).rgb;
   color = vec4(tonemap(vec3((diffuse + specular) + ambient * tex_color)), 1);
 }

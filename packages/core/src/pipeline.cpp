@@ -17,6 +17,29 @@ namespace gev
     return data;
   }
 
+  vk::PipelineColorBlendAttachmentState blend_attachment(default_blending mode)
+  {
+    switch (mode)
+    {
+      case default_blending::alpha_blending:
+        return vk::PipelineColorBlendAttachmentState().setBlendEnable(true).setColorWriteMask(
+          vk::ColorComponentFlagBits::eA | vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+          vk::ColorComponentFlagBits::eB)
+          .setSrcColorBlendFactor(vk::BlendFactor::eOne)
+          .setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha)
+          .setColorBlendOp(vk::BlendOp::eAdd)
+          .setSrcAlphaBlendFactor(vk::BlendFactor::eOne)
+          .setDstAlphaBlendFactor(vk::BlendFactor::eZero)
+          .setAlphaBlendOp(vk::BlendOp::eAdd);
+
+      case default_blending::none:
+      default:
+        return vk::PipelineColorBlendAttachmentState().setBlendEnable(false).setColorWriteMask(
+          vk::ColorComponentFlagBits::eA | vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+          vk::ColorComponentFlagBits::eB);
+    }
+  }
+
   vk::UniqueShaderModule create_shader(std::span<std::uint32_t const> src)
   {
     return engine::get().device().createShaderModuleUnique(vk::ShaderModuleCreateInfo().setCode(src));
@@ -115,9 +138,11 @@ namespace gev
     return *this;
   }
 
-  simple_pipeline_builder& simple_pipeline_builder::color_attachment(vk::Format format)
+  simple_pipeline_builder& simple_pipeline_builder::color_attachment(
+    vk::Format format, std::optional<vk::PipelineColorBlendAttachmentState> blend)
   {
     _color_formats.push_back(format);
+    _blend_attachments.push_back(blend.value_or(blend_attachment(default_blending::none)));
     return *this;
   }
 
@@ -136,6 +161,12 @@ namespace gev
   simple_pipeline_builder& simple_pipeline_builder::raster_discard(bool discard)
   {
     _raster_discard = discard;
+    return *this;
+  }
+
+  simple_pipeline_builder& simple_pipeline_builder::cull(vk::CullModeFlags mode)
+  {
+    _cull = mode;
     return *this;
   }
 
@@ -174,17 +205,7 @@ namespace gev
 
     vk::PipelineColorBlendStateCreateInfo blend;
     blend.logicOpEnable = false;
-
-    std::vector<vk::PipelineColorBlendAttachmentState> blends;
-    for (auto const& f : _color_formats)
-    {
-      auto& b = blends.emplace_back();
-      b.blendEnable = false;
-      b.colorWriteMask = vk::ColorComponentFlagBits::eA | vk::ColorComponentFlagBits::eR |
-        vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB;
-    }
-
-    blend.setAttachments(blends);
+    blend.setAttachments(_blend_attachments);
     info.pColorBlendState = &blend;
 
     auto const use_depth_test = _depth_format != vk::Format::eUndefined;
@@ -213,7 +234,7 @@ namespace gev
     info.pMultisampleState = &msaa;
 
     vk::PipelineRasterizationStateCreateInfo raster;
-    raster.cullMode = vk::CullModeFlagBits::eBack;
+    raster.cullMode = _cull;
     raster.frontFace = vk::FrontFace::eCounterClockwise;
     raster.polygonMode = vk::PolygonMode::eFill;
     raster.rasterizerDiscardEnable = _raster_discard;

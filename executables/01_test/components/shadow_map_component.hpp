@@ -16,4 +16,6 @@ public:
 
 private:
   std::unique_ptr<gev::game::cascaded_shadow_mapping> _csm;
+  gev::service_proxy<gev::game::mesh_renderer> _renderer;
+  gev::service_proxy<main_controls> _controls;
 };

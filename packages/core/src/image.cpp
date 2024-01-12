@@ -1,5 +1,6 @@
 #include <gev/engine.hpp>
 #include <gev/image.hpp>
+#include <vk_mem_alloc.h>
 
 namespace gev
 {
@@ -272,6 +273,13 @@ namespace gev
     _stage_mask = actual_stage_mask;
     _access_mask = actual_access_mask;
     _queue_family_index = actual_queue_family_index;
+  }
+
+  std::size_t image::size_bytes() const 
+  {
+    VmaAllocationInfo info;
+    vmaGetAllocationInfo(gev::engine::get().allocator().get(), _allocation.get(), &info);
+    return info.size;
   }
 
   void image::generate_mipmaps(vk::CommandBuffer c)

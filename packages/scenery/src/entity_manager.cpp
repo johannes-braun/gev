@@ -7,6 +7,22 @@ namespace gev::scenery
     return instantiate(~0, std::move(parent));
   }
 
+  void entity_manager::add(std::shared_ptr<entity> existing, std::shared_ptr<entity> parent)
+  {
+    _root_entities.push_back(existing);
+    assign_manager_impl(existing);
+
+    if (parent)
+      reparent(existing, parent);
+  }
+
+  void entity_manager::assign_manager_impl(std::shared_ptr<entity> existing)
+  {
+    existing->_manager = shared_from_this();
+    for (auto const& ch : existing->_children)
+      assign_manager_impl(ch);
+  }
+
   std::shared_ptr<entity> entity_manager::instantiate(std::size_t id, std::shared_ptr<entity> parent)
   {
     auto r = std::make_shared<entity>(id);

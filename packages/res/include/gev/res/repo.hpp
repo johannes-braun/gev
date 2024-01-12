@@ -22,13 +22,15 @@ namespace gev
 
     constexpr resource_id(std::size_t id) : _id(id) {}
 
+    constexpr resource_id() = default;
+
     constexpr std::size_t get() const
     {
       return _id;
     }
 
   private:
-    std::size_t _id;
+    std::size_t _id = 0ull;
   };
 
   template<typename TBase>

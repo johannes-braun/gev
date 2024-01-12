@@ -2,13 +2,11 @@
 
 void renderer_component::spawn()
 {
-  if (_renderer.expired())
-    _renderer = gev::service<gev::game::mesh_renderer>();
   if (!_shader)
-    _shader = gev::service<gev::game::shader_repo>()->get(gev::game::shaders::standard);
+    set_shader(gev::game::shaders::standard);
 }
 
-void renderer_component::update()
+void renderer_component::early_update()
 {
   if (_mesh_instance)
     _mesh_instance->update_transform(owner()->global_transform().matrix());
@@ -34,39 +32,22 @@ std::shared_ptr<gev::game::material> const& renderer_component::get_material() c
   return _material;
 }
 
-std::shared_ptr<gev::game::mesh_renderer> renderer_component::get_renderer() const
-{
-  if (_renderer.expired())
-    return nullptr;
-  return _renderer.lock();
-}
-
-void renderer_component::set_renderer(std::shared_ptr<gev::game::mesh_renderer> value)
-{
-  _renderer = std::move(value);
-  update_mesh();
-}
-
 void renderer_component::set_mesh(std::shared_ptr<gev::game::mesh> value)
 {
   _mesh = std::move(value);
   update_mesh();
 }
 
-// void renderer_component::set_df(std::shared_ptr<gev::game::distance_field_instance> value)
-//{
-//   _df = std::move(value);
-// }
-
-void renderer_component::set_shader(std::shared_ptr<gev::game::shader> shader)
+void renderer_component::set_shader(gev::resource_id shader)
 {
-  _shader = shader;
+  _shader_id = shader;
+  _shader = gev::service<gev::game::shader_repo>()->get(shader);
   update_mesh();
 }
 
-std::shared_ptr<gev::game::shader> const& renderer_component::get_shader()
+gev::resource_id renderer_component::get_shader()
 {
-  return _shader;
+  return _shader_id;
 }
 
 void renderer_component::set_material(std::shared_ptr<gev::game::material> value)
@@ -91,11 +72,34 @@ void renderer_component::try_destroy()
   }
 }
 
+void renderer_component::serialize(gev::serializer& base, std::ostream& out)
+{
+  gev::scenery::component::serialize(base, out);
+
+  base.write_direct_or_reference(out, _material);
+  base.write_direct_or_reference(out, _mesh);
+
+  write_typed(_shader_id, out);
+}
+
+void renderer_component::deserialize(gev::serializer& base, std::istream& in)
+{
+  gev::scenery::component::deserialize(base, in);
+
+  auto const material = base.read_direct_or_reference(in);
+  if (material)
+    set_material(as<gev::game::material>(material));
+
+  auto const mesh = base.read_direct_or_reference(in);
+  if (mesh)
+    set_mesh(as<gev::game::mesh>(mesh));
+
+  read_typed(_shader_id, in);
+  _shader = gev::service<gev::game::shader_repo>()->get(_shader_id);
+}
+
 void renderer_component::try_instantiate()
 {
-  if (_mesh && _shader && _material && !_renderer.expired())
-  {
-    auto r = _renderer.lock();
-    _mesh_instance = r->batch(_shader, _material)->instantiate(_mesh, owner()->global_transform());
-  }
+  if (_mesh && _shader && _material)
+    _mesh_instance = _renderer->batch(_shader, _material)->instantiate(_mesh, owner()->global_transform());
 }

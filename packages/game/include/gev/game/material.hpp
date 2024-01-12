@@ -1,13 +1,15 @@
 #pragma once
+#pragma once
 
 #include <gev/engine.hpp>
 #include <gev/game/texture.hpp>
 #include <rnu/math/math.hpp>
+#include <gev/res/serializer.hpp>
 
 namespace gev::game
 {
   class mesh_renderer;
-  class material
+  class material : public serializable
   {
   public:
     void load_diffuse(std::shared_ptr<texture> dt);
@@ -18,6 +20,9 @@ namespace gev::game
 
     void set_two_sided(bool enable);
     void bind(vk::CommandBuffer c, vk::PipelineLayout layout, std::uint32_t binding);
+
+    void serialize(serializer& base, std::ostream& out) override;
+    void deserialize(serializer& base, std::istream& in) override;
 
   private:
     void bind_or_unbind(std::shared_ptr<texture> const& t, std::uint32_t binding, std::uint32_t flags);

@@ -1,0 +1,37 @@
+#version 460 core
+
+layout(constant_id = 0) const int dir = 0;
+layout(local_size_x_id = 1, local_size_y_id = 2) in;
+
+layout(set = 0, binding = 0) uniform sampler2D in_texture;
+layout(set = 0, binding = 1) uniform writeonly image2D out_texture;
+
+layout( push_constant ) uniform Constants
+{
+  float gamma;
+} options;
+
+vec3 tonemapFilmic(vec3 x) {
+  vec3 X = max(vec3(0.0), x - 0.004);
+  vec3 result = (X * (6.2 * X + 0.5)) / (X * (6.2 * X + 1.7) + 0.06);
+  return pow(result, vec3(options.gamma));
+}
+
+#define tonemap tonemapFilmic
+
+void main()
+{
+  uvec2 max_size = uvec2(textureSize(in_texture, 0));
+  uvec2 gid = gl_GlobalInvocationID.xy;
+
+  if(gid.x >= max_size.x || gid.y >= max_size.y)
+    return;
+    
+  vec2 max_sizef = vec2(max_size);
+  ivec2 pixel = ivec2(gid);
+  vec2 pixelf = vec2(pixel) / max_sizef;
+
+  vec4 color = texelFetch(in_texture, pixel, 0);
+  vec4 result = vec4(tonemap(color.rgb), color.a);
+  imageStore(out_texture, pixel, result);
+}

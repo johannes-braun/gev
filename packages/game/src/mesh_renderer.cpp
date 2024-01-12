@@ -3,13 +3,12 @@
 #include <gev/game/mesh_renderer.hpp>
 #include <gev/pipeline.hpp>
 #include <gev_game_shaders_files.hpp>
+#include <gev/game/samplers.hpp>
 
 namespace gev::game
 {
   mesh_renderer::mesh_renderer()
   {
-    _shadow_map_holder = std::make_shared<shadow_map_holder>();
-
     _batches = std::make_shared<batch_map>();
   }
 
@@ -22,38 +21,17 @@ namespace gev::game
     return b;
   }
 
-  std::shared_ptr<shadow_map_holder> mesh_renderer::get_shadow_map_holder() const
+  void mesh_renderer::set_environment_map(vk::DescriptorSet set)
   {
-    return _shadow_map_holder;
+    _environment_set = set;
   }
 
-  void mesh_renderer::set_camera(std::shared_ptr<camera> cam)
+  void mesh_renderer::set_shadow_maps(vk::DescriptorSet set)
   {
-    _camera = std::move(cam);
+    _shadow_map_set = set;
   }
 
-  std::shared_ptr<camera> const& mesh_renderer::get_camera() const
-  {
-    return _camera;
-  }
-
-  void mesh_renderer::child_renderer(mesh_renderer& r, bool share_batches, bool share_shadow_maps)
-  {
-    if (share_batches)
-      r._batches = _batches;
-    if (share_shadow_maps)
-      r._shadow_map_holder = _shadow_map_holder;
-  }
-
-  void mesh_renderer::try_flush(vk::CommandBuffer c)
-  {
-    if (_camera)
-      _camera->sync(c);
-    _shadow_map_holder->try_flush_buffer(c);
-    try_flush_batches(c);
-  }
-
-  void mesh_renderer::try_flush_batches(vk::CommandBuffer c)
+  void mesh_renderer::sync(vk::CommandBuffer c)
   {
     for (auto const& b : *_batches)
     {
@@ -62,7 +40,8 @@ namespace gev::game
     }
   }
 
-  void mesh_renderer::render(vk::CommandBuffer c, std::int32_t x, std::int32_t y, std::uint32_t w, std::uint32_t h,
+  void mesh_renderer::render(vk::CommandBuffer c, camera const& cam, std::int32_t x, std::int32_t y, std::uint32_t w,
+    std::uint32_t h,
     pass_id pass, vk::SampleCountFlagBits samples)
   {
     for (auto const& [shader, batch] : *_batches)
@@ -72,8 +51,9 @@ namespace gev::game
       c.setScissor(0, vk::Rect2D({x, y}, {w, h}));
       c.setRasterizationSamplesEXT(samples);
 
-      shader->attach(c, _camera->descriptor(), camera_set);
-      shader->attach(c, _shadow_map_holder->descriptor(), shadow_maps_set);
+      shader->attach(c, cam.descriptor(), camera_set);
+      shader->attach(c, _shadow_map_set, shadow_maps_set);
+      shader->attach(c, _environment_set, environment_set);
 
       int draw_calls = 0;
       for (auto const& b : batch)

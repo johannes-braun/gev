@@ -5,13 +5,12 @@
 #include <gev/descriptors.hpp>
 #include <gev/engine.hpp>
 #include <gev/game/layouts.hpp>
+#include <gev/game/mesh_renderer.hpp>
 
-skin_component::skin_component(gev::scenery::skin skin, gev::scenery::transform_tree tree,
+skin_component::skin_component(gev::resource_id shader_id, gev::scenery::skin skin, gev::scenery::transform_tree tree,
   std::unordered_map<std::string, gev::scenery::joint_animation> animations)
-  : _skin(std::move(skin)), _tree(std::move(tree)), _animations(std::move(animations))
+  : _shader_id(shader_id), _skin(std::move(skin)), _tree(std::move(tree)), _animations(std::move(animations))
 {
-  auto const& layouts = gev::game::layouts::defaults();
-  _joints = gev::engine::get().get_descriptor_allocator().allocate(layouts.skinning_set_layout());
 }
 
 vk::DescriptorSet skin_component::skin_descriptor() const
@@ -21,6 +20,13 @@ vk::DescriptorSet skin_component::skin_descriptor() const
 
 void skin_component::early_update()
 {
+  if (!_joints)
+  {
+    auto const& layouts = gev::game::layouts::defaults();
+    _joints = gev::engine::get().get_descriptor_allocator().allocate(layouts.skinning_set_layout());
+  }
+
+  _shader_repo->get(_shader_id)->attach_always(_joints, gev::game::mesh_renderer::skin_set);
   auto const iter = _animations.find(_current_animation);
   if (iter != _animations.end())
   {
@@ -65,9 +71,46 @@ void skin_component::apply_child_transform(gev::scenery::entity& e)
 {
   if (auto const bone = e.get<bone_component>())
   {
-    bone->owner()->local_transform = _tree.nodes()[_skin.joint_node(bone->index())].matrix();
+    bone->owner()->local_transform = _tree.nodes()[_skin.joint_node(bone->index())].transformation.matrix();
   }
 
   for (auto const& c : e.children())
     apply_child_transform(*c);
+}
+
+void skin_component::serialize(gev::serializer& base, std::ostream& out)
+{
+  gev::scenery::component::serialize(base, out);
+
+  write_typed(_shader_id, out);
+  write_string(_current_animation, out);
+  _skin.serialize(base, out);
+  _tree.serialize(base, out);
+
+  write_size(_animations.size(), out);
+  for (auto& [name, anim] : _animations)
+  {
+    write_string(name, out);
+    anim.serialize(base, out);
+  }
+}
+
+void skin_component::deserialize(gev::serializer& base, std::istream& in)
+{
+  gev::scenery::component::deserialize(base, in);
+
+  read_typed(_shader_id, in);
+  read_string(_current_animation, in);
+  _skin.deserialize(base, in);
+  _tree.deserialize(base, in);
+
+  std::size_t count = 0ull;
+  read_size(count, in);
+  for (std::size_t i = 0; i < count; ++i)
+  {
+    std::string name;
+    read_string(name, in);
+    _animations[name].deserialize(base, in);
+  }
+  _running = false;
 }

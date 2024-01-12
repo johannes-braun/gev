@@ -1,4 +1,5 @@
 #include "ground_component.hpp"
+#include <gev/scenery/collider.hpp>
 
 void ground_component::spawn()
 {
@@ -18,7 +19,15 @@ void ground_component::spawn()
   auto c = 0;
   std::vector<float> hs(w * h);
 
-  generate_mesh(hs, w, h, 10.0f, 1.f);
+  for (int x = 0; x < w; ++x)
+  {
+    for (int y = 0; y < h; ++y)
+    {
+      hs[x * h + y] = std::sin(x / 2.0)-3;
+    }
+  }
+
+  generate_mesh(hs, w, h, 1.0f, 1.f);
   _mesh->load(_tri);
   _renderer->set_mesh(_mesh);
 }
@@ -70,4 +79,13 @@ void ground_component::generate_mesh(std::span<float> heights, int rx, int ry, f
   auto const pry_b = _tri.positions[ry - 2];
   auto const pry_c = _tri.positions[2 * ry - 1];
   _tri.normals[ry - 1] = rnu::cross(pry_c - pry_a, pry_b - pry_a);
+
+  auto const coll = owner()->get<gev::scenery::collider_component>();
+
+  auto const shape = std::make_shared<gev::scenery::collision_shape>();
+  shape->set(gev::scenery::indexed_mesh_shape{
+    .indices = _tri.indices,
+    .positions = _tri.positions
+  });
+  coll->set_shape(shape);
 }

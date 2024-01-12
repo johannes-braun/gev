@@ -30,12 +30,6 @@ namespace gev::scenery
     rnu::vec4 weights;
   };
 
-  struct node_data
-  {
-    int mesh;
-    std::string name;
-  };
-
   struct geometry_data
   {
     std::vector<std::uint32_t> indices;

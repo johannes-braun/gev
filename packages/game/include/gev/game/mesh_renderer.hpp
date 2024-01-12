@@ -24,29 +24,28 @@ namespace gev::game
     constexpr static std::uint32_t material_set = 1;
     constexpr static std::uint32_t object_info_set = 2;
     constexpr static std::uint32_t shadow_maps_set = 3;
-    constexpr static std::size_t min_num_instances = 64;
+    constexpr static std::uint32_t environment_set = 4;
+    constexpr static std::uint32_t skin_set = 5;
 
     mesh_renderer();
 
-    void set_camera(std::shared_ptr<camera> cam);
-    std::shared_ptr<camera> const& get_camera() const;
+    void render(vk::CommandBuffer c, camera const& cam, std::int32_t x, std::int32_t y, std::uint32_t w,
+      std::uint32_t h, pass_id pass, vk::SampleCountFlagBits samples);
 
-    void render(vk::CommandBuffer c, std::int32_t x, std::int32_t y, std::uint32_t w, std::uint32_t h, pass_id pass,
-      vk::SampleCountFlagBits samples);
-
-    std::shared_ptr<shadow_map_holder> get_shadow_map_holder() const;
     std::shared_ptr<mesh_batch> batch(std::shared_ptr<shader> const& shader, std::shared_ptr<material> const& material);
 
-    void child_renderer(mesh_renderer& r, bool share_batches = true, bool share_shadow_maps = true);
-    void try_flush_batches(vk::CommandBuffer c);
-    void try_flush(vk::CommandBuffer c);
+    void sync(vk::CommandBuffer c);
+
+    void set_environment_map(vk::DescriptorSet set);
+    void set_shadow_maps(vk::DescriptorSet set);
 
   protected:
     using batch_map = std::unordered_map<std::shared_ptr<shader>,
       std::unordered_map<std::shared_ptr<material>, std::shared_ptr<mesh_batch>>>;
 
-    std::shared_ptr<shadow_map_holder> _shadow_map_holder;
     std::shared_ptr<batch_map> _batches;
-    std::shared_ptr<camera> _camera;
+
+    vk::DescriptorSet _shadow_map_set;
+    vk::DescriptorSet _environment_set;
   };
 }    // namespace gev::game

@@ -82,3 +82,15 @@ void remote_controller_component::update()
     _smooth.update(10 * gev::engine::get().current_frame().delta_time);
   }
 }
+
+void remote_controller_component::serialize(gev::serializer& base, std::ostream& out)
+{
+  gev::scenery::component::serialize(base, out);
+  write_typed(_is_owned, out);
+}
+
+void remote_controller_component::deserialize(gev::serializer& base, std::istream& in)
+{
+  gev::scenery::component::deserialize(base, in);
+  read_typed(_is_owned, in);
+}

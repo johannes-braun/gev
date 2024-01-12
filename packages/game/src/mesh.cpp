@@ -36,7 +36,8 @@ namespace gev::game
   void mesh::make_skinned(std::span<scenery::joint const> joints)
   {
     _joints_buffer = gev::buffer::device_local(joints.size() * sizeof(scenery::joint),
-      vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer);
+      vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst |
+        vk::BufferUsageFlagBits::eVertexBuffer);
     _joints_buffer->load_data<scenery::joint>(joints);
   }
 
@@ -48,34 +49,6 @@ namespace gev::game
     if (tri.indices.empty() || tri.positions.empty())
       return;
 
-    gev::engine::get().device().waitIdle();
-
-    if (!_index_buffer || tri.indices.size() * sizeof(std::uint32_t) > _index_buffer->size())
-    {
-      _index_buffer = gev::buffer::device_local(tri.indices.size() * sizeof(std::uint32_t),
-        vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer |
-          vk::BufferUsageFlagBits::eTransferDst);
-    }
-    if (!_vertex_buffer || tri.positions.size() * sizeof(rnu::vec4) > _vertex_buffer->size())
-    {
-      _vertex_buffer = gev::buffer::device_local(tri.positions.size() * sizeof(rnu::vec4),
-        vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer |
-          vk::BufferUsageFlagBits::eTransferDst);
-    }
-    if (!_normal_buffer || tri.normals.size() * sizeof(rnu::vec3) > _normal_buffer->size())
-    {
-      _normal_buffer = gev::buffer::device_local(tri.normals.size() * sizeof(rnu::vec3),
-        vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst);
-    }
-    if (!_texcoords_buffer || tri.texcoords.size() * sizeof(rnu::vec2) > _texcoords_buffer->size())
-    {
-      _texcoords_buffer = gev::buffer::device_local(tri.texcoords.size() * sizeof(rnu::vec2),
-        vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst);
-    }
-
-    _num_indices = tri.indices.size();
-    _index_buffer->load_data<std::uint32_t>(tri.indices);
-
     std::vector<rnu::vec4> vec4_positions(tri.positions.size());
 
     rnu::vec4 min(std::numeric_limits<float>::max());
@@ -86,12 +59,50 @@ namespace gev::game
       min = rnu::min(min, point);
       max = rnu::max(max, point);
     }
-    _bounds.position = min;
-    _bounds.size = max - min;
+    rnu::box3f bounds;
+    bounds.position = min;
+    bounds.size = max - min;
 
-    _vertex_buffer->load_data<rnu::vec4>(vec4_positions);
-    _normal_buffer->load_data<rnu::vec3>(tri.normals);
-    _texcoords_buffer->load_data<rnu::vec2>(tri.texcoords);
+    init(bounds, tri.indices, vec4_positions, tri.normals, tri.texcoords);
+  }
+
+  void mesh::init(rnu::box3f bounds, std::span<std::uint32_t const> indices, std::span<rnu::vec4 const> positions,
+    std::span<rnu::vec3 const> normals, std::span<rnu::vec2 const> texcoords)
+  {
+    gev::engine::get().device().waitIdle();
+
+    if (!_index_buffer || indices.size() * sizeof(std::uint32_t) > _index_buffer->size())
+    {
+      _index_buffer = gev::buffer::device_local(indices.size() * sizeof(std::uint32_t),
+        vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer |
+          vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eTransferSrc);
+    }
+    if (!_vertex_buffer || positions.size() * sizeof(rnu::vec4) > _vertex_buffer->size())
+    {
+      _vertex_buffer = gev::buffer::device_local(positions.size() * sizeof(rnu::vec4),
+        vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer |
+          vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eTransferSrc);
+    }
+    if (!_normal_buffer || normals.size() * sizeof(rnu::vec3) > _normal_buffer->size())
+    {
+      _normal_buffer = gev::buffer::device_local(normals.size() * sizeof(rnu::vec3),
+        vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst |
+          vk::BufferUsageFlagBits::eTransferSrc);
+    }
+    if (!_texcoords_buffer || texcoords.size() * sizeof(rnu::vec2) > _texcoords_buffer->size())
+    {
+      _texcoords_buffer = gev::buffer::device_local(texcoords.size() * sizeof(rnu::vec2),
+        vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst |
+          vk::BufferUsageFlagBits::eTransferSrc);
+    }
+
+    _bounds = bounds;
+
+    _num_indices = indices.size();
+    _index_buffer->load_data<std::uint32_t>(indices);
+    _vertex_buffer->load_data<rnu::vec4>(positions);
+    _normal_buffer->load_data<rnu::vec3>(normals);
+    _texcoords_buffer->load_data<rnu::vec2>(texcoords);
   }
 
   void mesh::draw(vk::CommandBuffer c, std::uint32_t instance_count, std::uint32_t base_instance)
@@ -140,6 +151,41 @@ namespace gev::game
 
     c.bindIndexBuffer(_index_buffer->get_buffer(), 0, vk::IndexType::eUint32);
     c.drawIndexed(_num_indices, instance_count, 0, 0, base_instance);
+  }
+
+  void mesh::serialize(serializer& base, std::ostream& out)
+  {
+    write_typed(_bounds, out);
+    write_vector(_index_buffer->get_data<std::uint32_t>(), out);
+    write_vector(_vertex_buffer->get_data<rnu::vec4>(), out);
+    write_vector(_normal_buffer->get_data<rnu::vec3>(), out);
+    write_vector(_texcoords_buffer->get_data<rnu::vec2>(), out);
+
+    if (_joints_buffer)
+      write_vector(_joints_buffer->get_data<scenery::joint>(), out);
+    else
+      write_size(0ull, out);
+  }
+
+  void mesh::deserialize(serializer& base, std::istream& in)
+  {
+    std::vector<std::uint32_t> indices;
+    std::vector<rnu::vec4> positions;
+    std::vector<rnu::vec3> normals;
+    std::vector<rnu::vec2> texcoords;
+    std::vector<scenery::joint> joints;
+
+    read_typed(_bounds, in);
+    read_vector(indices, in);
+    read_vector(positions, in);
+    read_vector(normals, in);
+    read_vector(texcoords, in);
+
+    read_vector(joints, in);
+    init(_bounds, indices, positions, normals, texcoords);
+
+    if (!joints.empty())
+      make_skinned(joints);
   }
 
   rnu::box3f const& mesh::bounds() const

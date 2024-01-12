@@ -3,6 +3,46 @@
 
 namespace gev::game
 {
+  void write_projection(projection const& proj, std::ostream& out) 
+  {
+    struct
+    {
+      void operator()(perspective const& p) const
+      {
+        serializable::write_typed(p, out);
+      }
+
+      void operator()(ortho const& p) const
+      {
+        serializable::write_typed(p, out);
+      }
+
+      std::ostream& out;
+    } writer{out};
+
+    std::size_t index = proj.index();
+    serializable::write_size(index, out);
+    std::visit(writer, proj);
+  }
+
+  void read_projection(projection& proj, std::istream& in) 
+  {
+    std::size_t index = 0ull;
+    serializable::read_size(index, in);
+    if (index == 0)
+    {
+      perspective p;
+      serializable::read_typed(p, in);
+      proj = p;
+    }
+    else if (index == 1)
+    {
+      ortho p;
+      serializable::read_typed(p, in);
+      proj = p;
+    }
+  }
+
   camera::camera()
   {
     _per_frame.descriptor =
@@ -17,7 +57,7 @@ namespace gev::game
   {
     set_view(inverse(transform));
   }
-  
+
   void camera::set_view(rnu::mat4 view_matrix)
   {
     _view_matrix = view_matrix;
@@ -55,7 +95,7 @@ namespace gev::game
     _per_frame.uniform_buffer->sync(c);
   }
 
-  vk::DescriptorSet camera::descriptor()
+  vk::DescriptorSet camera::descriptor() const
   {
     return _per_frame.descriptor;
   }

@@ -44,7 +44,7 @@ namespace gev::game
 
     vk::DescriptorSet descriptor() const;
 
-    void try_flush_buffer(vk::CommandBuffer c);
+    void sync(vk::CommandBuffer c);
 
     void update_matrix_internal(std::size_t offset, rnu::mat4 matrix);
     void make_csm_root_internal(std::size_t offset, int num_cascades);

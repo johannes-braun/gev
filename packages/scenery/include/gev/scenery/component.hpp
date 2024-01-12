@@ -1,11 +1,12 @@
 #pragma once
 
 #include <gev/scenery/entity.hpp>
+#include <gev/res/serializer.hpp>
 #include <memory>
 
 namespace gev::scenery
 {
-  class component : public std::enable_shared_from_this<component>
+  class component : public std::enable_shared_from_this<component>, public serializable
   {
     friend class entity;
 
@@ -22,6 +23,15 @@ namespace gev::scenery
     virtual void deactivate() {}
     virtual void collides(
       std::shared_ptr<entity> other, float distance, rnu::vec3 point_on_self, rnu::vec3 point_on_other){}
+
+    virtual void serialize(serializer& base, std::ostream& out) override
+    {
+      write_typed(_active, out);
+    }
+    virtual void deserialize(serializer& base, std::istream& in) override
+    {
+      read_typed(_active, in);
+    }
 
   public:
     std::shared_ptr<entity> owner() const;

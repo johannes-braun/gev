@@ -16,6 +16,7 @@ namespace gev::game
     vk::DescriptorSetLayout material_set_layout() const;
     vk::DescriptorSetLayout shadow_map_layout() const;
     vk::DescriptorSetLayout skinning_set_layout() const;
+    vk::DescriptorSetLayout environment_set_layout() const;
 
   private:
     vk::UniqueDescriptorSetLayout _object_set_layout;
@@ -23,5 +24,6 @@ namespace gev::game
     vk::UniqueDescriptorSetLayout _material_set_layout;
     vk::UniqueDescriptorSetLayout _shadow_map_layout;
     vk::UniqueDescriptorSetLayout _skinning_set_layout;
+    vk::UniqueDescriptorSetLayout _environment_set_layout;
   };
 }    // namespace gev::game

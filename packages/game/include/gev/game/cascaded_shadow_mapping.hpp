@@ -12,9 +12,10 @@ namespace gev::game
   public:
     cascaded_shadow_mapping(vk::Extent2D size, std::size_t num_cascades = 3, float split_lambda = 0.7);
 
-    void render(vk::CommandBuffer c, gev::game::mesh_renderer& r, rnu::vec3 direction);
+    void render(vk::CommandBuffer c, gev::game::camera const& cam, 
+      gev::game::mesh_renderer& r, rnu::vec3 direction);
 
-    void enable();
+    void enable(shadow_map_holder& src);
     void disable();
 
   private:

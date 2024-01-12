@@ -23,7 +23,7 @@ void main()
   ivec2 pixel = ivec2(gid);
   vec2 pixelf = vec2(pixel) / max_sizef;
 
-  vec4 color = texture(in_texture, pixelf);
+  vec4 color = texelFetch(in_texture, pixel, 0);
   vec4 result = step(options.value, color) * options.value;
   imageStore(out_texture, pixel, result);
 }

@@ -22,7 +22,11 @@ target_sources(${GEV_CURRENT_LIBRARY} PRIVATE
   "src/shadow_map_holder.cpp"
   "src/shader.cpp"
   "src/sync_buffer.cpp"
-  "src/cascaded_shadow_mapping.cpp" "src/addition.cpp" "src/render_target_2d.cpp")
+  "src/cascaded_shadow_mapping.cpp"
+  "src/addition.cpp"
+  "src/render_target_2d.cpp"
+  "src/samplers.cpp"
+  "src/tonemap.cpp" "src/vignette.cpp" "src/film_grain.cpp")
 
 compile_shaders(gev_game_shaders
   "shaders/generate_distance_field.comp"
@@ -32,5 +36,8 @@ compile_shaders(gev_game_shaders
   "shaders/shader2_rig.vert"
   "shaders/blur.comp"
   "shaders/cutoff.comp"
-  "shaders/addition.comp")
+  "shaders/tonemap.comp"
+  "shaders/addition.comp"
+  "shaders/vignette.comp"
+  "shaders/film_grain.comp")
 target_link_libraries(gev.game PUBLIC gev_game_shaders)

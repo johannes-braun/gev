@@ -8,6 +8,8 @@
 #include <span>
 #include <variant>
 #include <vector>
+#include <gev/res/serializer.hpp>
+#include <gev/scenery/transform.hpp>
 
 namespace gev::scenery
 {
@@ -39,57 +41,44 @@ namespace gev::scenery
 
   struct transform_node
   {
-    struct loc_rot_scale
-    {
-      rnu::vec3 location;
-      rnu::quat rotation;
-      rnu::vec3 scale;
-    };
-    using transform = std::variant<rnu::mat4, loc_rot_scale>;
-
-    loc_rot_scale& lrs();
-    loc_rot_scale const& lrs() const;
-
-    void set_location(rnu::vec3 location);
-    void set_rotation(rnu::quat rotation);
-    void set_scale(rnu::vec3 scale);
-    void set_matrix(rnu::mat4 matrix);
-
-    rnu::mat4 matrix() const;
-
-    std::any data;
+    std::string name;
+    std::size_t mesh_reference;
     ptrdiff_t children_offset;
     size_t num_children;
     ptrdiff_t parent;
     transform transformation;
   };
 
-  enum class animation_target
+  enum class animation_target : std::uint8_t
   {
     location,
     rotation,
     scale
   };
 
-  class animation
+  class animation : public gev::serializable
   {
   public:
-    using checkpoints = std::variant<std::vector<rnu::vec3>, std::vector<rnu::quat>>;
-
-    animation(animation_target target, size_t node_index, checkpoints checkpoints, std::vector<float> timestamps);
-
+    animation() = default;
+    animation(animation_target target, size_t node_index, std::vector<rnu::vec3> vec3_checkpoints,
+      std::vector<rnu::quat> quat_checkpoints, std::vector<float> timestamps);
+    
     float duration() const;
 
     void transform(float time, float mix_factor, std::vector<transform_node>& nodes) const;
 
+    void serialize(serializer& base, std::ostream& out) override;
+    void deserialize(serializer& base, std::istream& in) override;
+
   private:
     size_t _node_index;
     animation_target _target;
-    checkpoints _checkpoints;
+    std::vector<rnu::vec3> _vec3_checkpoints;
+    std::vector<rnu::quat> _quat_checkpoints;
     std::vector<float> _timestamps;
   };
 
-  class joint_animation
+  class joint_animation : public gev::serializable
   {
   public:
     struct anim_info
@@ -104,6 +93,9 @@ namespace gev::scenery
 
     void update(std::chrono::duration<double> d, std::vector<transform_node>& nodes);
 
+    void serialize(serializer& base, std::ostream& out) override;
+    void deserialize(serializer& base, std::istream& in) override;
+
   private:
     anim_info _anim;
     size_t _current;
@@ -112,14 +104,17 @@ namespace gev::scenery
     rnu::smooth<double> _ramp_up;
   };
 
-  class transform_tree
+  class transform_tree : public serializable
   {
   public:
+    transform_tree() = default;
     transform_tree(std::vector<transform_node> nodes);
 
     void animate(joint_animation& animation, std::chrono::duration<double> delta);
     rnu::mat4 const& global_transform(size_t node) const;
     std::span<transform_node const> nodes() const;
+    void serialize(serializer& base, std::ostream& out) override;
+    void deserialize(serializer& base, std::istream& in) override;
 
   private:
     void recompute_globals();
@@ -128,9 +123,10 @@ namespace gev::scenery
     std::vector<rnu::mat4> _global_matrices;
   };
 
-  class skin
+  class skin : public serializable
   {
   public:
+    skin() = default;
     skin(size_t root, std::vector<std::uint32_t> joint_nodes, std::vector<rnu::mat4> joint_matrices);
 
     std::uint32_t joint_node(size_t index) const;
@@ -141,6 +137,9 @@ namespace gev::scenery
     std::uint32_t root_node() const;
 
     std::vector<rnu::mat4>& apply_global_transforms(transform_tree const& tree);
+    
+    void serialize(serializer& base, std::ostream& out) override;
+    void deserialize(serializer& base, std::istream& in) override;
 
   private:
     size_t _root_node;

@@ -43,6 +43,7 @@ define_property(TARGET PROPERTY
   
 add_subdirectory(libraries/rnu)
 add_subdirectory(packages/imgui)
+add_subdirectory(packages/res)
 add_subdirectory(packages/core)
 add_subdirectory(packages/scenery)
 add_subdirectory(packages/audio)

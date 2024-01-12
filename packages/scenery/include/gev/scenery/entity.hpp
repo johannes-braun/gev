@@ -1,6 +1,8 @@
 #pragma once
 
 #include <gev/scenery/transform.hpp>
+#include <gev/res/serializer.hpp>
+#include <gev/res/virtual_enable_shared_from_this.hpp>
 #include <memory>
 #include <span>
 #include <vector>
@@ -10,12 +12,14 @@ namespace gev::scenery
   class component;
   class entity_manager;
 
-  class entity : public std::enable_shared_from_this<entity>
+  class entity : public serializable
   {
     friend class entity_manager;
 
   public:
     transform local_transform;
+
+    entity() = default;
 
     entity(std::size_t id);
 
@@ -44,7 +48,7 @@ namespace gev::scenery
     template<typename Predicate>
     std::shared_ptr<entity> find_where(Predicate&& pred)
     {
-      auto self = shared_from_this();
+      auto self = unsafe_shared_from_this<entity>();
       if (pred(self))
         return self;
 
@@ -82,6 +86,9 @@ namespace gev::scenery
     bool is_inherited_active() const;
     bool is_active() const;
     void collides(std::shared_ptr<entity> other, float distance, rnu::vec3 point_on_self, rnu::vec3 point_on_other) const;
+
+    void serialize(gev::serializer& base, std::ostream& out);
+    void deserialize(gev::serializer& base, std::istream& in);
 
     std::span<std::shared_ptr<entity> const> children() const;
 

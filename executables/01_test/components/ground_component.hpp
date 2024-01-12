@@ -1,6 +1,7 @@
 #pragma once
 #include "renderer_component.hpp"
 
+#include <bullet/btBulletCollisionCommon.h>
 #include <gev/game/mesh.hpp>
 #include <gev/scenery/component.hpp>
 #include <memory>
@@ -21,4 +22,7 @@ private:
   rnu::triangulated_object_t _tri;
   std::shared_ptr<renderer_component> _renderer;
   std::shared_ptr<gev::game::mesh> _mesh;
+
+  std::shared_ptr<btTriangleIndexVertexArray> _tris;
+  std::shared_ptr<btBvhTriangleMeshShape> _collider;
 };

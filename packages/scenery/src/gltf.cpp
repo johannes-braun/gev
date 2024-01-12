@@ -28,12 +28,13 @@ namespace gev::scenery
   {
     auto const& child = model.nodes[node];
 
+    auto& inserted = nodes[state.relocations[node]];
     // apply transformation
     if (child.matrix.size() == 16)
     {
       rnu::mat4d mat;
       memcpy(&mat, child.matrix.data(), sizeof(rnu::mat4d));
-      nodes[state.relocations[node]].transformation = rnu::mat4(mat);
+      inserted.transformation = rnu::mat4(mat);
     }
     else
     {
@@ -51,17 +52,13 @@ namespace gev::scenery
       if (!child.scale.empty())
         memcpy(scale.data(), child.scale.data(), sizeof(rnu::vec3d));
 
-      transform_node::loc_rot_scale lrs;
-      lrs.location = trl;
-      lrs.rotation = rot;
-      lrs.scale = scale;
-      nodes[state.relocations[node]].transformation = lrs;
+      inserted.transformation.position = trl;
+      inserted.transformation.rotation = rot;
+      inserted.transformation.scale = scale;
     }
 
-    node_data data;
-    data.mesh = child.mesh;
-    data.name = child.name;
-    nodes[state.relocations[node]].data = std::move(data);
+    inserted.name = child.name;
+    inserted.mesh_reference = child.mesh;
 
     // first, insert all child nodes, then recurse
     auto const base_offset = nodes.size();
@@ -162,13 +159,14 @@ namespace gev::scenery
 
         auto& outacc = model.accessors[sampler.output];
 
-        animation::checkpoints checkpoints;
+        std::vector<rnu::vec3> vec3_checkpoints;
+        std::vector<rnu::quat> quat_checkpoints;
 
         switch (type)
         {
           case animation_target::location:
-          case animation_target::scale: checkpoints.emplace<0>(outacc.count); break;
-          case animation_target::rotation: checkpoints.emplace<1>(outacc.count); break;
+          case animation_target::scale: vec3_checkpoints.resize(outacc.count); break;
+          case animation_target::rotation: quat_checkpoints.resize(outacc.count); break;
         }
 
         for (auto [item, data] : elements_of(model, outacc))
@@ -176,20 +174,19 @@ namespace gev::scenery
           switch (type)
           {
             case animation_target::location:
-            case animation_target::scale:
-              memcpy(std::get<0>(checkpoints)[item].data(), data.data(), data.size());
+            case animation_target::scale: memcpy(vec3_checkpoints[item].data(), data.data(), data.size());
               break;
             case animation_target::rotation:
             {
               rnu::vec4 r;
               memcpy(r.data(), data.data(), data.size());
-              std::get<1>(checkpoints)[item] = rnu::normalize(rnu::quat(r.w, r.x, r.y, r.z));
+              quat_checkpoints[item] = rnu::normalize(rnu::quat(r.w, r.x, r.y, r.z));
               break;
             }
           }
         }
 
-        dst.emplace_back(type, node, std::move(checkpoints), std::move(timestamps));
+        dst.emplace_back(type, node, std::move(vec3_checkpoints), std::move(quat_checkpoints), std::move(timestamps));
       }
     }
     return anims;

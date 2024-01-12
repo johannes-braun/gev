@@ -1,17 +1,14 @@
 #include <gev/engine.hpp>
+#include <gev/game/formats.hpp>
 #include <gev/game/layouts.hpp>
 #include <gev/game/shader.hpp>
 #include <gev/pipeline.hpp>
 #include <gev_game_shaders_files.hpp>
 #include <rnu/math/math.hpp>
-#include <gev/game/formats.hpp>
 
 namespace gev::game
 {
-  shader::shader()
-  {
-    _pipelines.resize(std::size_t(pass_id::num_passes));
-  }
+  shader::shader() = default;
 
   void shader::invalidate()
   {
@@ -30,17 +27,15 @@ namespace gev::game
     if (_force_rebuild || !_layout)
     {
       _pipelines.clear();
-      _pipelines.resize(std::size_t(pass_id::num_passes));
       _force_rebuild = false;
       _layout = rebuild_layout();
     }
 
-    if (!_pipelines[std::size_t(pass)])
-    {
-      _pipelines[std::size_t(pass)] = rebuild(pass);
-    }
+    auto& p = _pipelines[pass];
+    if (!p)
+      p = rebuild(pass);
 
-    return _pipelines[std::size_t(pass)].get();
+    return p.get();
   }
 
   vk::PipelineLayout shader::layout() const
@@ -50,7 +45,7 @@ namespace gev::game
 
   void shader::attach_always(vk::DescriptorSet set, std::uint32_t index)
   {
-    _global_bindings.emplace_back(index, set);
+    _global_bindings[index] = set;
   }
 
   void shader::attach(vk::CommandBuffer c, vk::DescriptorSet set, std::uint32_t index)
@@ -71,13 +66,14 @@ namespace gev::game
         auto const& default_layouts = layouts::defaults();
         return gev::create_pipeline_layout({default_layouts.camera_set_layout(), default_layouts.material_set_layout(),
           default_layouts.object_set_layout(), default_layouts.shadow_map_layout(),
-          default_layouts.skinning_set_layout()});
+          default_layouts.environment_set_layout(), default_layouts.skinning_set_layout()});
       }
       else
       {
         auto const& default_layouts = layouts::defaults();
         return gev::create_pipeline_layout({default_layouts.camera_set_layout(), default_layouts.material_set_layout(),
-          default_layouts.object_set_layout(), default_layouts.shadow_map_layout()});
+          default_layouts.object_set_layout(), default_layouts.shadow_map_layout(),
+          default_layouts.environment_set_layout()});
       }
     }
 

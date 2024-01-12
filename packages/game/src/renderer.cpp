@@ -23,41 +23,14 @@ namespace gev::game
       vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled |
         vk::ImageUsageFlagBits::eTransferSrc,
       _samples);
-    /*_depth_target.image =
-      gev::image_creator::get()
-        .size(size.width, size.height)
-        .type(vk::ImageType::e2D)
-        .samples(_samples)
-        .usage(vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled |
-          vk::ImageUsageFlagBits::eTransferSrc)
-        .format(_depth_format)
-        .build();
-    _depth_target.view = _depth_target.image->create_view(vk::ImageViewType::e2D);*/
-
+ 
     _color_target = std::make_unique<render_target_2d>(size, _color_format, _color_usage_flags, _samples);
-    /* _color_target.image =
-       gev::image_creator::get()
-         .size(size.width, size.height)
-         .type(vk::ImageType::e2D)
-         .samples(_samples)
-         .usage(_color_usage_flags)
-         .format(_color_format)
-         .build();
-     _color_target.view = _color_target.image->create_view(vk::ImageViewType::e2D);*/
 
     _resolve_target.reset();
     if (_samples != vk::SampleCountFlagBits::e1)
     {
       _resolve_target = std::make_unique<render_target_2d>(
         size, _color_format, _color_usage_flags | vk::ImageUsageFlagBits::eTransferDst);
-      /* gev::image_creator::get()
-         .size(size.width, size.height)
-         .type(vk::ImageType::e2D)
-         .samples(vk::SampleCountFlagBits::e1)
-         .usage(_color_usage_flags | vk::ImageUsageFlagBits::eTransferDst)
-         .format(_color_format)
-         .build();
-     _resolve_target.view = _resolve_target.image->create_view(vk::ImageViewType::e2D);*/
     }
   }
 
@@ -77,6 +50,11 @@ namespace gev::game
       _samples = samples;
       rebuild_attachments();
     }
+  }
+
+  vk::SampleCountFlagBits renderer::get_samples() const
+  {
+    return _samples;
   }
 
   renderer::renderer(vk::Extent2D size, vk::SampleCountFlagBits samples)
@@ -151,42 +129,6 @@ namespace gev::game
     force_build_attachments();
     return _resolve_target ? *_resolve_target : *_color_target;
   }
-
-  // std::shared_ptr<gev::image> renderer::color_image()
-  //{
-  //   force_build_attachments();
-  //   return _color_target.image;
-  // }
-
-  // std::shared_ptr<gev::image> renderer::depth_image()
-  //{
-  //   force_build_attachments();
-  //   return _depth_target.image;
-  // }
-
-  // vk::ImageView renderer::color_image_view()
-  //{
-  //   force_build_attachments();
-  //   return _color_target.view.get();
-  // }
-
-  // vk::ImageView renderer::depth_image_view()
-  //{
-  //   force_build_attachments();
-  //   return _depth_target.view.get();
-  // }
-
-  // std::shared_ptr<gev::image> renderer::resolve_image()
-  //{
-  //   force_build_attachments();
-  //   return _resolve_target.image ? _resolve_target.image : _color_target.image;
-  // }
-
-  // vk::ImageView renderer::resolve_image_view()
-  //{
-  //   force_build_attachments();
-  //   return _resolve_target.view ? _resolve_target.view.get() : _color_target.view.get();
-  // }
 
   void renderer::set_color_usage(vk::ImageUsageFlags flags)
   {

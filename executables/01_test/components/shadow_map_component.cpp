@@ -1,16 +1,18 @@
 #include "shadow_map_component.hpp"
 
+#include "../main_controls.hpp"
+
 #include <gev/imgui/imgui_impl_vulkan.h>
 
 void shadow_map_component::spawn()
 {
   constexpr std::uint32_t size = 2048;
-  _csm = std::make_unique<gev::game::cascaded_shadow_mapping>(vk::Extent2D(size, size), 4, 0.7f);
+  _csm = std::make_unique<gev::game::cascaded_shadow_mapping>(vk::Extent2D(size, size), 4, 0.6f);
 }
 
 void shadow_map_component::activate()
 {
-  _csm->enable();
+  _csm->enable(*gev::service<gev::game::shadow_map_holder>());
 }
 
 void shadow_map_component::deactivate()
@@ -25,11 +27,6 @@ void shadow_map_component::late_update()
   else
     owner()->apply_transform();
 
-  gev::frame frame = gev::engine::get().current_frame();
-  auto& cmd = frame.command_buffer;
-
   auto const dir = owner()->global_transform().forward();
-  auto const r = gev::service<gev::game::mesh_renderer>();
-
-  _csm->render(cmd, *r, dir);
+  _csm->render(gev::current_frame().command_buffer, *_controls->main_camera, *_renderer, dir);
 }

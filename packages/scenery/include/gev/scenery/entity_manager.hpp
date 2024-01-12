@@ -9,6 +9,7 @@ namespace gev::scenery
   {
   public:
     std::shared_ptr<entity> instantiate(std::shared_ptr<entity> parent = nullptr);
+    void add(std::shared_ptr<entity> existing, std::shared_ptr<entity> parent = nullptr);
     std::shared_ptr<entity> instantiate(std::size_t id, std::shared_ptr<entity> parent = nullptr);
     void reparent(std::shared_ptr<entity> const& target, std::shared_ptr<entity> new_parent = nullptr);
 
@@ -29,6 +30,8 @@ namespace gev::scenery
     std::shared_ptr<entity> find_by_id(std::size_t id);
 
   private:
+    void assign_manager_impl(std::shared_ptr<entity> existing);
+
     void remove_from_parent(std::shared_ptr<entity> const& target);
     void add_to_parent(std::shared_ptr<entity> const& target, std::shared_ptr<entity> parent = nullptr);
 

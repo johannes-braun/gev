@@ -23,9 +23,21 @@ namespace gev
     }
     void load_data(void const* data, std::uint32_t size, std::uint32_t offset = 0);
 
+    template<typename T>
+    std::vector<T> get_data(std::size_t offset = 0)
+    {
+      std::vector<T> data(_size / sizeof(T));
+      get_data(data.data(), _size, offset);
+      return data;
+    }
+
+    void get_data(void* data, std::uint32_t size, std::uint32_t offset = 0);
+
     void copy_to(vk::CommandBuffer c, buffer const& other, std::uint32_t size = VK_WHOLE_SIZE,
       std::uint32_t src_offset = 0, std::uint32_t dst_offset = 0);
-    void copy_to(vk::CommandBuffer c, image const& other, vk::ImageAspectFlagBits aspect, int mip_layer = 0);
+    void copy_to(vk::CommandBuffer c, image const& other, vk::ImageAspectFlagBits aspect, int mip_level = 0,
+      std::size_t buffer_offset = 0);
+    void copy_from(vk::CommandBuffer c, image const& other, vk::ImageAspectFlagBits aspect, int mip_level = 0, std::size_t buffer_offset = 0);
 
     vk::Buffer get_buffer() const;
     std::size_t size() const noexcept;

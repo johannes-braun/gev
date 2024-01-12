@@ -22,6 +22,7 @@ namespace gev::game
 
     void set_render_size(vk::Extent2D size);
     void set_samples(vk::SampleCountFlagBits samples);
+    vk::SampleCountFlagBits get_samples() const;
 
     void prepare_frame(vk::CommandBuffer c, bool use_depth = true, bool use_color = true);
     void begin_render(vk::CommandBuffer c, bool use_depth = true, bool use_color = true);
@@ -30,12 +31,6 @@ namespace gev::game
 
     void resolve(vk::CommandBuffer c);
 
-    //std::shared_ptr<gev::image> resolve_image();
-    //vk::ImageView resolve_image_view();
-    //std::shared_ptr<gev::image> color_image();
-    //std::shared_ptr<gev::image> depth_image();
-    //vk::ImageView color_image_view();
-    //vk::ImageView depth_image_view();
     render_target_2d const& color_target();
     render_target_2d const& depth_target();
     render_target_2d const& resolve_target();

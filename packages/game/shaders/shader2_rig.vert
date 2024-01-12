@@ -26,7 +26,7 @@ layout(std430, set = 2, binding = 0) restrict readonly buffer EntityInfos
   entity_info entity_infos[];
 };
 
-layout(std430, set = 4, binding = 0) restrict readonly buffer Joints
+layout(std430, set = 5, binding = 0) restrict readonly buffer Joints
 {
   mat4 joints[];
 };

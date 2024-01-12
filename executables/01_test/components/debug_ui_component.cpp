@@ -90,3 +90,15 @@ std::string const& debug_ui_component::name() const
 {
   return _name;
 }
+
+void debug_ui_component::serialize(gev::serializer& base, std::ostream& out)
+{
+  gev::scenery::component::serialize(base, out);
+  write_string(_name, out);
+}
+
+void debug_ui_component::deserialize(gev::serializer& base, std::istream& in)
+{
+  gev::scenery::component::deserialize(base, in);
+  read_string(_name, in);
+}

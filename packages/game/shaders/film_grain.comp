@@ -1,0 +1,35 @@
+#version 460 core
+
+layout(constant_id = 0) const int dir = 0;
+layout(local_size_x_id = 1, local_size_y_id = 2) in;
+
+layout(set = 0, binding = 0) uniform sampler2D in_texture;
+layout(set = 0, binding = 1) uniform writeonly image2D out_texture;
+
+layout( push_constant ) uniform Constants
+{
+  float strength;
+  float clock;
+} options;
+
+void main()
+{
+  uvec2 max_size = uvec2(textureSize(in_texture, 0));
+  uvec2 gid = gl_GlobalInvocationID.xy;
+
+  if(gid.x >= max_size.x || gid.y >= max_size.y)
+    return;
+    
+  vec2 max_sizef = vec2(max_size);
+  ivec2 pixel = ivec2(gid);
+  vec2 pixelf = vec2(pixel) / max_sizef;
+  
+  float noiser = (fract(sin(dot(pixelf + options.clock, vec2(12.9898,78.233)*2.0)) * 43758.5453));
+  float noiseg = (fract(sin(dot(pixelf * 20 + options.clock, vec2(12.9898,78.233)*2.0)) * 43758.5453));
+  float noiseb = (fract(sin(dot(pixelf * 49 + options.clock, vec2(12.9898,78.233)*2.0)) * 43758.5453));
+  vec3 noise = vec3(noiser, noiseg, noiseb);
+
+  vec4 color = texelFetch(in_texture, pixel, 0);
+  vec4 result = vec4(mix(color.rgb, color.rgb + noise, options.strength), color.a);
+  imageStore(out_texture, pixel, result);
+}

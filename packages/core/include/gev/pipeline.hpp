@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <vulkan/vulkan.hpp>
+#include <optional>
 
 namespace gev
 {
@@ -13,6 +14,14 @@ namespace gev
 
   vk::UniquePipeline build_compute_pipeline(
     vk::PipelineLayout layout, vk::ShaderModule module, char const* entry = "main", vk::SpecializationInfo* spec = nullptr);
+
+  enum class default_blending
+  {
+    none,
+    alpha_blending
+  };
+
+  vk::PipelineColorBlendAttachmentState blend_attachment(default_blending mode);
 
   class simple_pipeline_builder
   {
@@ -38,10 +47,11 @@ namespace gev
       std::uint32_t binding, std::uint32_t stride, vk::VertexInputRate rate = vk::VertexInputRate::eVertex);
 
     simple_pipeline_builder& multisampling(vk::SampleCountFlagBits samples);
-    simple_pipeline_builder& color_attachment(vk::Format format);
+    simple_pipeline_builder& color_attachment(vk::Format format, std::optional<vk::PipelineColorBlendAttachmentState> blend = std::nullopt);
     simple_pipeline_builder& depth_attachment(vk::Format format);
     simple_pipeline_builder& stencil_attachment(vk::Format format);
     simple_pipeline_builder& raster_discard(bool discard);
+    simple_pipeline_builder& cull(vk::CullModeFlags mode);
 
     void clear();
     vk::UniquePipeline build();
@@ -57,10 +67,12 @@ namespace gev
     std::vector<vk::VertexInputAttributeDescription> _attributes;
     std::vector<vk::VertexInputBindingDescription> _bindings;
     std::vector<vk::Format> _color_formats;
+    std::vector<vk::PipelineColorBlendAttachmentState> _blend_attachments;
     vk::Format _depth_format = vk::Format::eUndefined;
     vk::Format _stencil_format = vk::Format::eUndefined;
     vk::SampleCountFlagBits _samples = vk::SampleCountFlagBits::e1;
     vk::PrimitiveTopology _topology = vk::PrimitiveTopology::eTriangleList;
+    vk::CullModeFlags _cull = vk::CullModeFlagBits::eBack;
     bool _raster_discard = false;
   };
 }    // namespace gev

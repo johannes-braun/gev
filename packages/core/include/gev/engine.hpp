@@ -12,7 +12,7 @@
 #include <gev/image.hpp>
 #include <gev/imgui/imgui.h>
 #include <gev/logger.hpp>
-#include <gev/repo.hpp>
+#include <gev/res/repo.hpp>
 #include <gev/service_locator.hpp>
 #include <gev/vma.hpp>
 #include <gev/window.hpp>
@@ -164,6 +164,11 @@ namespace gev
     return engine::get().device();
   }
 
+  static inline frame const& current_frame()
+  {
+    return engine::get().current_frame();
+  }
+
   template<typename Svc, typename... Args>
   std::shared_ptr<Svc> register_service(Args&&... args)
   {
@@ -175,4 +180,23 @@ namespace gev
   {
     return gev::engine::get().services().resolve<Svc>();
   }
+
+  template<typename T>
+  class service_proxy
+  {
+  public:
+    T* operator->() const {
+      if (_service.expired())
+        _service = service<T>();
+
+      return _service.lock().get();
+    }
+
+    T& operator*() const {
+      return *operator->();
+    }
+
+  private:
+    mutable std::weak_ptr<T> _service;
+  };
 }    // namespace gev

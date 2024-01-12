@@ -70,4 +70,27 @@ namespace gev::game
     c.setCullMode(_two_sided ? vk::CullModeFlagBits::eNone : vk::CullModeFlagBits::eBack);
     c.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout, binding, _texture_descriptor, nullptr);
   }
+
+  void material::serialize(serializer& base, std::ostream& out)
+  {
+    base.write_direct_or_reference(out, _diffuse);
+    base.write_direct_or_reference(out, _roughness);
+    write_typed(_data, out);
+    write_typed(_two_sided, out);
+  }
+
+  void material::deserialize(serializer& base, std::istream& in) 
+  {
+    auto const diff = base.read_direct_or_reference(in);
+    if (diff)
+      load_diffuse(as<texture>(diff));
+
+    auto const rough = base.read_direct_or_reference(in);
+    if (rough)
+      load_roughness(as<texture>(rough));
+
+    read_typed(_data, in);
+    read_typed(_two_sided, in);
+    _update_buffer = true;
+  }
 }    // namespace gev::game

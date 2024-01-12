@@ -13,6 +13,9 @@ namespace gev::game
   using perspective = rnu::perspective_projection<float>;
   using ortho = rnu::ortho_projection<float>;
 
+  void write_projection(projection const& proj, std::ostream& out);
+  void read_projection(projection& proj, std::istream& in);
+
   class camera
   {
   public:
@@ -26,7 +29,7 @@ namespace gev::game
     rnu::mat4 projection_matrix() const;
 
     void sync(vk::CommandBuffer c);
-    vk::DescriptorSet descriptor();
+    vk::DescriptorSet descriptor() const;
     void bind(vk::CommandBuffer c, vk::PipelineLayout layout, std::uint32_t binding);
 
   private:

@@ -15,7 +15,7 @@ add_executable(01_test
   "components/sound_component.cpp"
   "environment_shader.cpp"
   "gltf_loader.cpp"
-  "components/debug_ui_component.cpp" "components/ground_component.cpp" "components/remote_controller_component.cpp")
+  "components/debug_ui_component.cpp" "components/ground_component.cpp" "components/remote_controller_component.cpp" "environment.cpp" "post_process.cpp")
 target_link_libraries(01_test PRIVATE gev.core gev.scenery gev.imgui gev.audio gev.game)
 add_custom_command(TARGET 01_test POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:01_test> $<TARGET_FILE_DIR:01_test>
@@ -28,6 +28,9 @@ add_custom_command(TARGET 01_test POST_BUILD
 
 compile_shaders(
   test_shaders
+  "shaders/cube_environment.vert"
+  "shaders/cube_environment.geom"
+  "shaders/cube_diffuse.frag"
   "shaders/environment.vert"
   "shaders/environment.frag"
   "shaders/generate_distance_field.comp"
@@ -35,6 +38,8 @@ compile_shaders(
   "shaders/draw_ddf.frag"
   "shaders/grass.vert"
   "shaders/grass.frag"
+  "shaders/ui.frag"
+  "shaders/ui.vert"
 )
 target_link_libraries(01_test PRIVATE test_shaders rnu::rnu)
 

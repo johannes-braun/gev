@@ -1,4 +1,5 @@
 #include "sound_component.hpp"
+
 #include <gev/engine.hpp>
 
 void sound_component::update()
@@ -83,4 +84,22 @@ void sound_component::set_pitch(float p)
   _pitch = p;
   if (_playback)
     _playback->set_pitch(_pitch);
+}
+
+void sound_component::serialize(gev::serializer& base, std::ostream& out) {
+
+  gev::scenery::component::serialize(base, out);
+
+  write_typed(_looping, out);
+  write_typed(_volume, out);
+  write_typed(_pitch, out);
+}
+
+void sound_component::deserialize(gev::serializer& base, std::istream& in)
+{
+  gev::scenery::component::deserialize(base, in);
+
+  read_typed(_looping, in);
+  read_typed(_volume, in);
+  read_typed(_pitch, in);
 }

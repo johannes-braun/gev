@@ -2,6 +2,7 @@
 #include <gev/scenery/component.hpp>
 #include <gev/scenery/entity.hpp>
 #include <print>
+#include <gev/scenery/entity_manager.hpp>
 
 namespace gev::scenery
 {
@@ -14,7 +15,7 @@ namespace gev::scenery
 
   void entity::add(std::shared_ptr<component> c)
   {
-    c->_parent = shared_from_this();
+    c->_parent = unsafe_shared_from_this<entity>();
     _components.push_back(std::move(c));
 
     std::sort(_components.begin(), _components.end(),
@@ -25,7 +26,7 @@ namespace gev::scenery
   std::shared_ptr<entity> entity::find_by_id(std::size_t id)
   {
     if (id == _id)
-      return shared_from_this();
+      return unsafe_shared_from_this<entity>();
 
     for (auto const& c : _children)
     {
@@ -149,6 +150,58 @@ namespace gev::scenery
 
     for (auto const& c : _children)
       c->update();
+  }
+
+  enum class ref_type : std::uint8_t
+  {
+    direct,
+    ref
+  };
+
+  void entity::serialize(gev::serializer& base, std::ostream& out)
+  {
+    write_size(_id, out);
+    write_typed(_active, out);
+    write_typed(local_transform, out);
+
+    write_size(_components.size(), out);
+    for (auto const& c : _components)
+    {
+      base.write(out, c);
+    }
+
+    write_size(_children.size(), out);
+    for (auto const& c : _children)
+      base.write_direct_or_reference(out, c);
+  }
+
+  void entity::deserialize(gev::serializer& base, std::istream& in)
+  {
+    auto tmp_manager = std::make_shared<entity_manager>();
+    
+    read_size(_id, in);
+    read_typed(_active, in);
+    read_typed(local_transform, in);
+
+    std::size_t num = 0;
+    read_size(num, in);
+    _components.reserve(num);
+    for (size_t i = 0; i < num; ++i)
+    {
+      auto const comp = as<component>(base.read(in));
+      comp->_parent = unsafe_shared_from_this<entity>();
+      _components.emplace_back(comp);
+    }
+
+    num = 0;
+    read_size(num, in);
+    _children.reserve(num);
+    auto const self_ptr = unsafe_shared_from_this<entity>();
+    for (size_t i = 0; i < num; ++i)
+    {
+      auto const child = base.read_direct_or_reference(in);
+      tmp_manager->reparent(as<entity>(child), self_ptr);
+    }
   }
 
   void entity::collides(

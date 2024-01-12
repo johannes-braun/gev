@@ -1,18 +1,16 @@
 #pragma once
 
+#include <gev/res/repo.hpp>
 #include <rnu/algorithm/hash.hpp>
 #include <vector>
 #include <vulkan/vulkan.hpp>
-#include <gev/repo.hpp>
 
 namespace gev::game
 {
   enum class pass_id : std::size_t
   {
     forward = 0,
-    shadow = 1,
-
-    num_passes
+    shadow = 1
   };
 
   class shader
@@ -36,9 +34,9 @@ namespace gev::game
     virtual vk::UniquePipeline rebuild(pass_id pass) = 0;
 
   private:
-    std::vector<std::pair<std::uint32_t, vk::DescriptorSet>> _global_bindings;
+    std::unordered_map<std::uint32_t, vk::DescriptorSet> _global_bindings;
     bool _force_rebuild = false;
-    std::vector<vk::UniquePipeline> _pipelines;
+    std::unordered_map<pass_id, vk::UniquePipeline> _pipelines;
     vk::UniquePipelineLayout _layout;
   };
 
@@ -79,5 +77,5 @@ namespace gev::game
   {
     constexpr static resource_id standard = "DEFAULT";
     constexpr static resource_id skinned = "SKINNED";
-  }
+  }    // namespace shaders
 }    // namespace gev::game

@@ -26,4 +26,4 @@ target_sources(${GEV_CURRENT_LIBRARY} PRIVATE
   "src/audio_host.cpp" 
   "src/sound.cpp"
   "src/playback.cpp"
-  "src/source_allocator.cpp")
+  "src/source_allocator.cpp" "src/listener.cpp")
